@@ -37,16 +37,45 @@ function renderD2Monitor() {
     for (let i = 1; i <= (sysSettings.numStations_d2 || 15); i++) {
         let status = (sysSettings.d2_status && sysSettings.d2_status[i]) || 'green';
         let conf = sysSettings.d2_configs ? sysSettings.d2_configs[i] : { type: 'time' };
-        let maxVal = (conf.type === 'time') ? ((sysSettings.d2_maxMin * 60) + 59) : sysSettings.d2_maxScore;
+        let maxVal = (conf.type === 'time') ? ((sysSettings.d2_maxMin || 59) * 60 + (sysSettings.d2_maxSec || 59)) : sysSettings.d2_maxScore;
 
-        let recs = recordsD2.filter(r => r.station === i && !r.isLikeOnly && r.val >= 0 && r.val <= maxVal);
+        let stRecs = recordsD2.filter(r => r.station === i && !r.isLikeOnly && r.val >= 0 && r.val <= maxVal);
+        
+        // 🌟 1. 嚴格過濾各隊「生涯最佳成績」的那一筆紀錄物件
+        let bestRecsMap = {};
+        stRecs.forEach(r => {
+            if (!bestRecsMap[r.team]) {
+                bestRecsMap[r.team] = r;
+            } else {
+                if (conf.type === 'time' ? r.val < bestRecsMap[r.team].val : r.val > bestRecsMap[r.team].val) {
+                    bestRecsMap[r.team] = r;
+                }
+            }
+        });
+
+        let recs = Object.values(bestRecsMap);
         recs.sort((a, b) => conf.type === 'time' ? a.val - b.val : b.val - a.val);
 
-        let top3 = recs.slice(0, 3).map((r, idx) => `<li><span>${['🥇', '🥈', '🥉'][idx]} ${r.team}</span><span>${r.val}</span><div><button class="btn btn-setting" style="padding:2px 5px;" onclick="window.editD2('${r.id}', ${r.station}, '${r.team}', ${r.val})">改</button><button class="del-btn" onclick="window.delD2('${r.id}')">刪</button></div></li>`).join('');
-        let others = recs.slice(3).map(r => `<li><span>${r.team}</span><span>${r.val}</span><button class="del-btn" onclick="window.delD2('${r.id}')">刪</button></li>`).join('');
-        let detailHtml = others ? `<details><summary>其他名次 ▼</summary><ul class="record-list">${others}</ul></details>` : '';
+        // 🌟 2. 密集排名 (同分同名次，1,1,1,2,3...)
+        let currRank = 1;
+        recs.forEach((r, idx) => {
+            if (idx > 0 && r.val !== recs[idx - 1].val) currRank++;
+            r.rank = currRank;
+        });
 
-        container.innerHTML += `<div class="glass-card station-box"><div class="station-title"><span class="status-dot ${status === 'red' ? 'dot-red' : 'dot-green'}"></span>第 ${i} 關</div><ul class="record-list">${top3 || '<li style="color:#aaa;">尚無成績</li>'}</ul>${detailHtml}</div>`;
+        // 取出名次為 1, 2, 3 的所有紀錄顯示在上方
+        let topRecs = recs.filter(r => r.rank <= 3);
+        let otherRecs = recs.filter(r => r.rank > 3);
+
+        let topHtml = topRecs.map(r => {
+            let badge = (r.rank === 1) ? '🥇' : ((r.rank === 2) ? '🥈' : '🥉');
+            return `<li><span>${badge} ${r.team}</span><span>${r.val}</span><div><button class="btn btn-setting" style="padding:2px 5px;" onclick="window.editD2('${r.id}', ${r.station}, '${r.team}', ${r.val})">改</button><button class="del-btn" onclick="window.delD2('${r.id}')">刪</button></div></li>`;
+        }).join('');
+
+        let othersHtml = otherRecs.map(r => `<li><span>第${r.rank}名 ${r.team}</span><span>${r.val}</span><button class="del-btn" onclick="window.delD2('${r.id}')">刪</button></li>`).join('');
+        let detailHtml = othersHtml ? `<details><summary>其他名次 ▼</summary><ul class="record-list">${othersHtml}</ul></details>` : '';
+
+        container.innerHTML += `<div class="glass-card station-box"><div class="station-title"><span class="status-dot ${status === 'red' ? 'dot-red' : 'dot-green'}"></span>第 ${i} 關</div><ul class="record-list">${topHtml || '<li style="color:#aaa;">尚無成績</li>'}</ul>${detailHtml}</div>`;
     }
 }
 
@@ -348,21 +377,29 @@ window.updateScoreSummary = function() {
     }
 
     // 3. 算 D2 (自動塞入 "7/3_大地(D2)")
+    // 4. 算 D2 (嚴格去重 + 密集排名給分)
     let d2Rules = sysSettings.d2_rules || { top1:300, top2:200, top3:100, base:50 };
     let d2LikePts = sysSettings.d2_likePts || 10;
     for(let i=1; i<= (sysSettings.numStations_d2 || 15); i++) {
         let conf = sysSettings.d2_configs ? sysSettings.d2_configs[i] : { type:'time' };
         let maxVal = (conf.type === 'time') ? ((sysSettings.d2_maxMin||59) * 60 + (sysSettings.d2_maxSec||59)) : (sysSettings.d2_maxScore||999);
         let stRecs = recordsD2.filter(r => r.station === i && !r.isLikeOnly && r.val >= 0 && r.val <= maxVal);
+        
         let teamBest = {};
         stRecs.forEach(r => {
-            if (!teamBest[r.team]) teamBest[r.team] = r.val;
+            if (teamBest[r.team] === undefined) teamBest[r.team] = r.val;
             else teamBest[r.team] = (conf.type === 'time') ? Math.min(teamBest[r.team], r.val) : Math.max(teamBest[r.team], r.val);
         });
         let uniqueRecs = Object.keys(teamBest).map(t => ({ team: t, val: teamBest[t] })).sort((a,b) => conf.type === 'time' ? a.val - b.val : b.val - a.val);
+
+        // 🌟 密集排名並發送對應積分
+        let currRank = 1;
         uniqueRecs.forEach((r, idx) => {
+            if (idx > 0 && r.val !== uniqueRecs[idx - 1].val) currRank++;
+            r.rank = currRank;
+
             if(!scores[r.team]) return;
-            let pts = idx===0 ? d2Rules.top1 : (idx===1 ? d2Rules.top2 : (idx===2 ? d2Rules.top3 : d2Rules.base));
+            let pts = (r.rank === 1) ? d2Rules.top1 : ((r.rank === 2) ? d2Rules.top2 : ((r.rank === 3) ? d2Rules.top3 : d2Rules.base));
             if(scores[r.team]["7/3_大地(D2)"] !== undefined) scores[r.team]["7/3_大地(D2)"] += pts;
         });
     }

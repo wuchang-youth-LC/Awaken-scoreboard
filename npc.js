@@ -56,6 +56,7 @@ function calcAndRender() {
     }
 
     // 1. 算 D2
+    // 1. 算 D2
     let d2Rules = sysSettings.d2_rules || { top1:300, top2:200, top3:100, base:50 };
     let d2LikePts = sysSettings.d2_likePts || 10;
     for(let i=1; i<= (sysSettings.numStations_d2 || 15); i++) {
@@ -64,13 +65,19 @@ function calcAndRender() {
         let stRecs = recordsD2.filter(r => r.station === i && !r.isLikeOnly && r.val >= 0 && r.val <= maxVal);
         let teamBest = {};
         stRecs.forEach(r => {
-            if (!teamBest[r.team]) teamBest[r.team] = r.val;
+            if (teamBest[r.team] === undefined) teamBest[r.team] = r.val;
             else teamBest[r.team] = (conf.type === 'time') ? Math.min(teamBest[r.team], r.val) : Math.max(teamBest[r.team], r.val);
         });
         let uniqueRecs = Object.keys(teamBest).map(t => ({ team: t, val: teamBest[t] })).sort((a,b) => conf.type === 'time' ? a.val - b.val : b.val - a.val);
+
+        // 🌟 密集排名給分
+        let currRank = 1;
         uniqueRecs.forEach((r, idx) => {
+            if (idx > 0 && r.val !== uniqueRecs[idx - 1].val) currRank++;
+            r.rank = currRank;
+
             if(!scores[r.team]) return;
-            let pts = idx===0 ? d2Rules.top1 : (idx===1 ? d2Rules.top2 : (idx===2 ? d2Rules.top3 : d2Rules.base));
+            let pts = (r.rank === 1) ? d2Rules.top1 : ((r.rank === 2) ? d2Rules.top2 : ((r.rank === 3) ? d2Rules.top3 : d2Rules.base));
             if(scores[r.team]["7/3_大地(D2)"] !== undefined) scores[r.team]["7/3_大地(D2)"] += pts;
         });
     }
