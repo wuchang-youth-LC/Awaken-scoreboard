@@ -3,30 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2026營會排行榜</title>
-    <!-- 這一行很重要，它負責把剛剛寫的 style.css 連接進來 -->
+    <title>D2 排行榜｜2026 Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <h1>D2 排行榜</h1>
-    
-     <!-- 這是大容器，給它一個 id 叫 board，裡面清空，交給 JavaScript 處理！ -->
-    <div class="grid-container" id="board">
-        <!-- 裡面的 15 關卡片刪掉，我們讓程式自動長出來 -->
+<body class="display">
+    <header class="page-head">
+        <span class="brand">ALL IN</span>
+        <h1>D2 自由闖關排行榜</h1>
+    </header>
+
+    <main class="station-grid" id="board"></main>
+
+    <section class="panel likes-board">
+        <h2>各隊累積讚數</h2>
+        <div class="likes-grid" id="likes"></div>
+    </section>
+
+    <button class="btn btn-outline map-btn" data-open-map>地圖</button>
+    <div class="map-modal" id="mapModal">
+        <img src="map.jpg" alt="D2 營會地圖">
+        <button class="btn btn-outline" data-close>關閉</button>
     </div>
 
-    <!-- 你的 app.js 連接設定 -->
     <script type="module" src="app.js"></script>
 </body>
-<!-- 🗺️ D2 右上角地圖按鈕 -->
-    <button class="map-btn" onclick="document.getElementById('mapModal').style.display='flex'">地圖</button>
-
-    <!-- 🗺️ D2 地圖彈窗 -->
-    <div class="map-modal" id="mapModal">
-        <div class="map-content">
-            <img src="map.jpg" alt="D2 營會地圖">
-            <!-- 🌟 叉叉按鈕移到這裡，就會在圖片的正下方 -->
-            <button class="map-close" onclick="document.getElementById('mapModal').style.display='none'">✖</button>
-        </div>
-    </div>
 </html>

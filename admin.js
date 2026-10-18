@@ -1,121 +1,125 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// D2 關主頁：網址帶 ?station=N
+import { watchSettings, watchCollection, patchSettings, commit, collection, addDoc, deleteDoc, doc, db } from "./firebase.js";
+import { d2StationConfig, formatD2Value, formatTime, clampInt, d2MaxVal } from "./scoring.js";
+import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge, overlay, stationFromUrl } from "./ui.js";
 
-const firebaseConfig = { apiKey: "AIzaSyBo5iMRonG0rFu6ZuIBJFXzwnWF9xiAKgQ", authDomain: "awaken-c5fca.firebaseapp.com", projectId: "awaken-c5fca", storageBucket: "awaken-c5fca.firebasestorage.app" };
-const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const urlParams = new URLSearchParams(window.location.search); const currentStation = parseInt(urlParams.get('station')) || 1;
+const station = stationFromUrl();
+let settings = null, conf = { type: "time", unit: "" };
+let busy = false, likes = 0, records = [];
 
-let sysSettings = { d2_status: {}, d2_configs: {}, numTeams: 15, d2_maxLikes: 3, d2_maxMin: 59, d2_maxScore: 999 };
-let currentConf = { type: 'time', unit: '' };
-let isOccupied = false, sessionLikes = 0;
+const setOnline = connectionBadge();
+const showLock = overlay(`<div class="title">輸入已鎖定</div><div class="sub">等待總控台開放</div>`);
 
-const lockOverlay = document.createElement('div');
-lockOverlay.style = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); color:white; z-index:9999; flex-direction:column; justify-content:center; align-items:center; font-size:2em; font-weight:bold; backdrop-filter:blur(10px);";
-lockOverlay.innerHTML = "🔒<br>輸入已鎖定<br><span style='font-size:0.5em; color:#ccc; margin-top:10px;'>等待總控台開放</span>";
-document.body.appendChild(lockOverlay);
-
-function updateLikeUI() {
-    const btn = document.getElementById('instantLikeBtn');
-    const max = sysSettings.d2_maxLikes || 3;
-    btn.innerHTML = `送出 👍<br><small>(${sessionLikes}/${max})</small>`;
-    btn.disabled = (!isOccupied || sessionLikes >= max);
-    btn.style.background = (btn.disabled) ? "#bdc3c7" : "#f1c40f";
+function renderStatus() {
+    const btn = $("statusBtn");
+    btn.className = `status-toggle ${busy ? "busy" : ""}`;
+    btn.innerHTML = busy
+        ? `<span class="dot" style="background:#fff"></span>闖關中 <small>點一下改回空關</small>`
+        : `<span class="dot dot-free"></span>目前空關 <small>隊伍到了點一下開始</small>`;
+    renderLikes();
 }
 
-document.getElementById('statusToggleBtn').addEventListener('click', async () => {
-    isOccupied = !isOccupied;
-    let newStatus = { ...sysSettings.d2_status };
-    newStatus[currentStation] = isOccupied ? 'red' : 'green';
-    document.getElementById('statusToggleBtn').innerText = "更新中...";
-    if (isOccupied) sessionLikes = 0;
-    await updateDoc(doc(db, "settings_global", "global"), { d2_status: newStatus });
+function renderLikes() {
+    const max = settings ? settings.d2_maxLikes : 3;
+    likes = Math.min(likes, max);
+    $("likeCount").textContent = likes;
+    $("likeMax").textContent = max;
+    $("likeMinus").disabled = !busy || likes <= 0;
+    $("likePlus").disabled = !busy || likes >= max;
+}
+
+function renderRecords() {
+    const mine = records.filter(r => r.station === station && !r.isLikeOnly).sort((a, b) => b.createdAt - a.createdAt);
+    $("records").innerHTML = mine.length
+        ? mine.map(r => `
+            <li>
+                <div>
+                    <div class="main">${esc(r.team)}　<span class="num">${esc(formatD2Value(r.val, conf))}</span></div>
+                    <div class="meta">讚 ${r.likes || 0}・${new Date(r.createdAt).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}</div>
+                </div>
+                <button class="btn btn-ghost danger" data-del="${esc(r.id)}">刪除</button>
+            </li>`).join("")
+        : `<li class="empty">尚無成績</li>`;
+}
+
+async function setBusy(next) {
+    busy = next;
+    if (busy) likes = 0;
+    renderStatus();
+    await patchSettings({ [`d2_status.${station}`]: busy ? "red" : "green" });
+}
+
+$("statusBtn").addEventListener("click", () => setBusy(!busy).catch(() => toast("燈號更新失敗，請再試一次", "error")));
+$("likePlus").addEventListener("click", () => { likes++; renderLikes(); });
+$("likeMinus").addEventListener("click", () => { likes--; renderLikes(); });
+
+// 輸入上限防呆
+$("minInput").addEventListener("input", e => {
+    if (e.target.value !== "") e.target.value = clampInt(e.target.value, 0, settings.d2_maxMin);
+});
+$("secInput").addEventListener("input", e => {
+    if (e.target.value !== "") e.target.value = clampInt(e.target.value, 0, 59);
+});
+$("scoreInput").addEventListener("input", e => {
+    if (e.target.value !== "") e.target.value = clampInt(e.target.value, 0, settings.d2_maxScore);
 });
 
-document.getElementById('instantLikeBtn').addEventListener('click', () => {
-    if (!isOccupied) return alert("❌ 請先切換為「🔴 闖關中」！");
-    sessionLikes++; updateLikeUI();
+$("records").addEventListener("click", async e => {
+    const id = e.target.closest("[data-del]")?.dataset.del;
+    if (id && confirm("確定刪除這筆成績？")) await deleteDoc(doc(db, "records_d2", id));
 });
 
-onSnapshot(doc(db, "settings_global", "global"), (docSnap) => {
-    // 🌟 極強防呆：如果文檔存在就覆蓋，不存在就用預設值
-    if (docSnap.exists()) sysSettings = { ...sysSettings, ...docSnap.data() };
-    
-    lockOverlay.style.display = sysSettings.d2_locked ? "flex" : "none";
-    isOccupied = (sysSettings.d2_status && sysSettings.d2_status[currentStation] === 'red');
-    
-    const sBtn = document.getElementById('statusToggleBtn');
-    sBtn.className = isOccupied ? "status-btn status-red" : "status-btn status-green";
-    sBtn.innerText = isOccupied ? "🔴 闖關中 (點擊切換空關)" : "🟢 目前為空關 (點擊開始)";
-    updateLikeUI();
-
-    const tSelect = document.getElementById('teamSelect');
-    const currSel = tSelect.value; tSelect.innerHTML = "";
-    for (let i = 1; i <= (sysSettings.numTeams || 15); i++) tSelect.innerHTML += `<option value="第${i}隊">第 ${i} 隊</option>`;
-    if (currSel) tSelect.value = currSel;
-
-    currentConf = (sysSettings.d2_configs && sysSettings.d2_configs[currentStation]) ? sysSettings.d2_configs[currentStation] : { type: 'time', unit: '' };
-    document.getElementById('stationDisplay').innerText = `第 ${currentStation} 關 (${currentConf.type==='time'?'⏱️計時':'🎯計分'})`;
-    
-    if (currentConf.type === 'time') {
-        document.getElementById('timeInputGroup').style.display = "block"; document.getElementById('scoreInputGroup').style.display = "none";
+$("submitBtn").addEventListener("click", async () => {
+    if (!busy) return toast("請先點上方按鈕切換為「闖關中」", "warn");
+    const team = $("teamSelect").value;
+    let val;
+    if (conf.type === "time") {
+        const min = parseInt($("minInput").value, 10) || 0;
+        const sec = parseInt($("secInput").value, 10) || 0;
+        val = min * 60 + sec;
+        if (val === 0) return toast("請輸入時間", "warn");
     } else {
-        document.getElementById('timeInputGroup').style.display = "none"; document.getElementById('scoreInputGroup').style.display = "block";
-        document.getElementById('scoreLabel').innerText = `獲得數值 (單位: ${currentConf.unit||''}):`;
+        val = parseInt($("scoreInput").value, 10);
+        if (Number.isNaN(val)) return toast("請輸入數值", "warn");
     }
-});
+    if (val < 0 || val > d2MaxVal(settings, conf)) return toast("數值超過上限，請再確認", "warn");
 
-onSnapshot(collection(db, "records_d2"), (snapshot) => {
-    const board = document.getElementById('stationLeaderboard'); board.innerHTML = "";
-    let records = []; snapshot.forEach(d => records.push({ id: d.id, ...d.data() }));
+    const shown = formatD2Value(val, conf);
+    if (!confirm(`確認送出？\n${team}　${shown}　讚 ${likes}`)) return;
 
-    let stRecs = records.filter(r => r.station === currentStation && !r.isLikeOnly).sort((a, b) => b.createdAt - a.createdAt);
-    if (stRecs.length === 0) { board.innerHTML = "<p style='color:#888;'>尚無成績</p>"; return; }
-
-    stRecs.forEach(r => {
-        let display = (currentConf && currentConf.type === 'time') ? `${Math.floor(r.val / 60)}分${r.val % 60}秒` : `${r.val}`;
-        const item = document.createElement('div'); item.className = 'record-item';
-        item.innerHTML = `<span><b>${r.team}</b> (👍x${r.likes||0})<br><small style="color:#aaa;">${display}</small></span><button class="delete-btn" data-id="${r.id}">刪除</button>`;
-        board.appendChild(item);
-    });
-    document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-        if (confirm("刪除？")) await deleteDoc(doc(db, "records_d2", e.target.getAttribute('data-id')));
-    }));
-});
-
-// 🌟 修正的即時防呆監聽器
-document.getElementById('minInput').addEventListener('input', function () {
-    let max = sysSettings.d2_maxMin !== undefined ? sysSettings.d2_maxMin : 59; 
-    if (parseInt(this.value) > max) this.value = max;
-});
-// 👇 新增秒數的防呆
-document.getElementById('secInput').addEventListener('input', function () {
-    let maxS = sysSettings.d2_maxSec !== undefined ? sysSettings.d2_maxSec : 59; 
-    if (parseInt(this.value) > maxS) this.value = maxS;
-});
-document.getElementById('scoreInput').addEventListener('input', function () {
-    let max = sysSettings.d2_maxScore || 999; if (parseInt(this.value) > max) this.value = max;
-});
-
-document.getElementById('submitBtn').addEventListener('click', async () => {
-    if (!isOccupied) return alert("❌ 請切換為「🔴 闖關中」才能送出成績！");
-    const team = document.getElementById('teamSelect').value;
-    let val = 0;
-    
-    if (currentConf.type === 'time') {
-        const min = parseInt(document.getElementById('minInput').value) || 0, sec = parseInt(document.getElementById('secInput').value) || 0;
-        if (min === 0 && sec === 0) return alert("請輸入時間！");
-        val = (min * 60) + sec;
-    } else {
-        val = parseInt(document.getElementById('scoreInput').value);
-        if (isNaN(val)) return alert("請輸入數值！");
-    }
-
+    $("submitBtn").disabled = true;
     try {
-        document.getElementById('submitBtn').disabled = true;
-        await addDoc(collection(db, "records_d2"), { station: currentStation, team, val, likes: sessionLikes, createdAt: Date.now() });
-        document.getElementById('minInput').value = ""; document.getElementById('secInput').value = ""; document.getElementById('scoreInput').value = "";
-        document.getElementById('statusToggleBtn').click(); 
-        alert("✅ 送出成功！");
-    } catch (error) { alert("發生錯誤"); }
-    document.getElementById('submitBtn').disabled = false;
+        const result = await commit(addDoc(collection(db, "records_d2"), {
+            station, team, val, likes, createdAt: Date.now()
+        }));
+        $("minInput").value = ""; $("secInput").value = ""; $("scoreInput").value = "";
+        await commit(setBusy(false));
+        toastCommit(result, `${team} 成績已送出`);
+    } catch (err) {
+        console.error(err);
+        toast("送出失敗，請檢查網路後再試", "error");
+    } finally {
+        $("submitBtn").disabled = false;
+    }
 });
+
+watchSettings((s, online) => {
+    settings = s;
+    setOnline(online);
+    showLock(s.d2_locked);
+    busy = s.d2_status[station] === "red";
+    conf = d2StationConfig(s, station);
+
+    $("stationTitle").textContent = `第 ${station} 關・${conf.type === "time" ? "計時" : "計分"}`;
+    $("timeGroup").hidden = conf.type !== "time";
+    $("scoreGroup").hidden = conf.type === "time";
+    $("scoreLabel").textContent = conf.unit ? `獲得數值（${conf.unit}）` : "獲得數值";
+    $("timeHint").textContent = `上限 ${formatTime(d2MaxVal(s, { type: "time" }))}`;
+    $("scoreHint").textContent = `上限 ${s.d2_maxScore}`;
+    fillTeamSelect($("teamSelect"), s.numTeams);
+
+    renderStatus();
+    renderRecords();
+});
+
+watchCollection("records_d2", list => { records = list; renderRecords(); });

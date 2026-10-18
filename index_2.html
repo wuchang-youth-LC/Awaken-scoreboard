@@ -3,39 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>戰績排行榜</title>
+    <title>D3 排行榜｜2026 Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <style>
-        .leaderboard-container { width: 95%; max-width: 1000px; margin: 20px auto; display: flex; flex-direction: column; gap: 10px; }
-        
-        .rank-badge { width: 50px; text-align: center; font-size: 1.2em; color: #ffd700; }
-        .team-name { flex: 1; text-align: left; padding-left: 20px; color: white; }
-        .win-loss { flex: 1; text-align: center; color: #2ecc71; }
-        .likes { width: 120px; text-align: right; color: #f1c40f; text-shadow: 1px 1px 2px #000; }
-
-        @media (max-width: 768px) {
-            .leaderboard-row { font-size: 1.1em; padding: 10px 15px; }
-            .team-name { padding-left: 10px; }
-            .likes { width: 80px; }
-        }
-    </style>
 </head>
-<body>
-    <h1>D3 排行榜</h1>
-    <div class="leaderboard-container" id="leaderboard">
-        <!-- 戰績會自動插入這裡 -->
+<body class="display">
+    <div class="standings">
+        <header class="page-head">
+            <span class="brand">ALL IN</span>
+            <h1>D3 PK 對抗排行榜</h1>
+        </header>
+        <div class="standings-head">
+            <span>名次</span><span>隊伍</span><span>下一關</span><span>戰績</span><span class="likes">讚</span>
+        </div>
+        <main id="leaderboard"></main>
     </div>
+
+    <button class="btn btn-outline map-btn" data-open-map>地圖</button>
+    <div class="map-modal" id="mapModal">
+        <img src="map_2.jpg" alt="D3 營會地圖">
+        <button class="btn btn-outline" data-close>關閉</button>
+    </div>
+
     <script type="module" src="app_2.js"></script>
 </body>
-<!-- 🗺️ D3 右上角地圖按鈕 -->
-    <button class="map-btn" onclick="document.getElementById('mapModal').style.display='flex'">地圖</button>
-
-    <!-- 🗺️ D3 地圖彈窗 -->
-    <div class="map-modal" id="mapModal">
-        <div class="map-content">
-            <img src="map_2.jpg" alt="D3 營會地圖">
-            <!-- 🌟 叉叉按鈕移到這裡，就會在圖片的正下方 -->
-            <button class="map-close" onclick="document.getElementById('mapModal').style.display='none'">✖</button>
-        </div>
-    </div>
 </html>

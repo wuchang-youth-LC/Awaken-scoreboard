@@ -3,51 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D2 關主專用後台</title>
+    <title>D2 關主｜2026 Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <style>
-        .container { background: rgba(15, 20, 30, 0.9); padding: 20px; border-radius: 12px; max-width: 400px; margin: 20px auto; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 8px 16px rgba(0,0,0,0.6); backdrop-filter: blur(8px); text-align: center; }
-        .station-badge { background: #e67e22; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; display: inline-block; font-size: 1.2em; }
-        .status-btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-bottom: 20px; transition: 0.2s; color: white; }
-        .status-green { background-color: #2ecc71; box-shadow: 0 0 10px #2ecc71; }
-        .status-red { background-color: #e74c3c; box-shadow: 0 0 10px #e74c3c; }
-        .form-group { margin-bottom: 15px; text-align: left; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; color: #ecf0f1; }
-        select, input { width: 100%; padding: 12px; font-size: 1.1em; border-radius: 5px; border: 1px solid #7f8c8d; background: #2c3e50; color: white; font-weight: bold; }
-        .time-inputs { display: flex; gap: 10px; }
-        .action-row { display: flex; gap: 10px; margin-top: 20px; }
-        .btn-like { flex: 1; background: #f1c40f; color: #333; font-weight: bold; border-radius: 8px; border: none; font-size: 1.1em; cursor: pointer; }
-        .btn-submit { flex: 1; background: #27ae60; color: white; font-weight: bold; border-radius: 8px; border: none; font-size: 1.1em; padding: 15px; cursor: pointer; }
-        .btn-like:disabled, .btn-submit:disabled { background: #7f8c8d; cursor: not-allowed; }
-        .record-item { background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #e67e22; text-align: left; }
-    </style>
 </head>
 <body>
-    <div class="container" id="mainContainer">
-        <div class="station-badge" id="stationDisplay">正在載入關卡...</div>
-        
-        <button id="statusToggleBtn" class="status-btn status-green">🟢 空關 (點擊切換)</button>
+    <div class="phone">
+        <header class="page-head">
+            <span class="brand">D2</span>
+            <h1 id="stationTitle">載入中…</h1>
+        </header>
 
-        <div class="form-group"><label>選擇目前隊伍：</label><select id="teamSelect"></select></div>
+        <button id="statusBtn" class="status-toggle"></button>
 
-        <div class="form-group" id="timeInputGroup">
-            <label>花費時間：</label>
-            <div class="time-inputs"><input type="number" id="minInput" placeholder="分" min="0"><input type="number" id="secInput" placeholder="秒" min="0" max="59"></div>
+        <div class="panel">
+            <div class="field">
+                <label class="label" for="teamSelect">隊伍</label>
+                <select id="teamSelect"></select>
+            </div>
+
+            <div class="field" id="timeGroup">
+                <label class="label">花費時間</label>
+                <div class="time-row">
+                    <input type="number" id="minInput" inputmode="numeric" placeholder="0" min="0"><span>分</span>
+                    <input type="number" id="secInput" inputmode="numeric" placeholder="0" min="0" max="59"><span>秒</span>
+                </div>
+                <p class="hint" id="timeHint"></p>
+            </div>
+
+            <div class="field" id="scoreGroup" hidden>
+                <label class="label" for="scoreInput" id="scoreLabel">獲得數值</label>
+                <input type="number" id="scoreInput" inputmode="numeric" placeholder="0" min="0">
+                <p class="hint" id="scoreHint"></p>
+            </div>
+
+            <div class="field">
+                <label class="label">給這隊的讚</label>
+                <div class="stepper">
+                    <button id="likeMinus" aria-label="減少讚">−</button>
+                    <span class="count"><span class="num" id="likeCount">0</span> / <span id="likeMax">3</span></span>
+                    <button id="likePlus" aria-label="增加讚">+</button>
+                </div>
+            </div>
+
+            <button id="submitBtn" class="btn btn-primary btn-block">送出成績</button>
         </div>
 
-        <div class="form-group" id="scoreInputGroup" style="display: none;">
-            <label id="scoreLabel">獲得分數：</label><input type="number" id="scoreInput" placeholder="請輸入數值" min="0">
-        </div>
-
-        <div class="action-row">
-            <button id="instantLikeBtn" class="btn-like">👍 暫存讚賞<br><small id="likeCountText">(0/3)</small></button>
-            <button id="submitBtn" class="btn-submit">送出成績<br>🚀</button>
-        </div>
-
-        <hr style="border-top:1px solid rgba(255,255,255,0.2); margin:20px 0;">
-        <h3 style="margin-top: 0; color:#f1c40f;">🏆 本關闖關紀錄</h3>
-        <div id="stationLeaderboard"></div>
+        <h2 class="section-title">本關紀錄</h2>
+        <div class="panel"><ul class="record-list" id="records"></ul></div>
     </div>
+
     <script type="module" src="admin.js"></script>
 </body>
 </html>

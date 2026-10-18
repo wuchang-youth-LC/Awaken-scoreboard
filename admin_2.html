@@ -3,76 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D3 關主專用後台</title>
+    <title>D3 關主｜2026 Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <style>
-        .container { background: rgba(15, 20, 30, 0.9); padding: 20px; border-radius: 12px; max-width: 400px; margin: 20px auto; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 8px 16px rgba(0,0,0,0.6); backdrop-filter: blur(8px); text-align: center; }
-        .station-badge { background: #e74c3c; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; display: inline-block; font-size: 1.2em; }
-        .status-btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-bottom: 15px; transition: 0.2s; color: white; }
-        .status-green { background-color: #2ecc71; box-shadow: 0 0 10px #2ecc71; }
-        .status-red { background-color: #e74c3c; box-shadow: 0 0 10px #e74c3c; }
-        
-        .round-ctrl { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
-        .round-ctrl button { background: #34495e; color: white; border: none; padding: 5px 15px; border-radius: 5px; font-weight: bold; font-size: 1.2em; cursor: pointer; }
-        
-        .team-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
-        .team-row select { flex: 1; padding: 12px; font-size: 1.1em; border-radius: 5px; border: 1px solid #7f8c8d; background: #2c3e50; color: white; font-weight: bold; }
-        .square-btn { width: 55px; height: 50px; background: #f1c40f; color: #333; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.2; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-        .square-btn:disabled { background: #7f8c8d; cursor: not-allowed; }
-        
-        .vs-text { font-size: 1.8em; font-weight: bold; color: #e74c3c; margin: 5px 0; font-style: italic; }
-        
-        .winner-box { background: rgba(231, 76, 60, 0.2); border: 1px solid #e74c3c; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        .btn-submit { background: #27ae60; color: white; width: 100%; padding: 15px; font-size: 1.2em; border-radius: 8px; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; }
-        .record-item { background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid #e74c3c; text-align: left; }
-    </style>
 </head>
 <body>
-    <div class="container" id="mainContainer">
-        <div class="station-badge" id="stationDisplay">正在載入關卡...</div>
-        
-        <button id="statusToggleBtn" class="status-btn status-green">🟢 空關 (點擊切換)</button>
+    <div class="phone">
+        <header class="page-head">
+            <span class="brand">D3</span>
+            <h1 id="stationTitle">載入中…</h1>
+        </header>
 
-        <div class="round-ctrl">
-            <button id="prevRoundBtn">◀</button>
-            <b id="roundText" style="font-size:1.2em; color:#f1c40f;">第 1 輪</b>
-            <button id="nextRoundBtn">▶</button>
-        </div>
+        <button id="statusBtn" class="status-toggle"></button>
 
-        <!-- 🌟 更新後的隊伍與按讚區塊 -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
-                <select id="teamASelect" style="padding: 12px; font-size: 1.1em; border-radius: 5px; border: 1px solid #7f8c8d; background: #2c3e50; color: white; font-weight: bold;"></select>
-                <button class="square-btn" id="likeBtnA" style="margin: 0 auto;">👍<br><small id="cntA">0</small></button>
+        <div class="panel">
+            <div class="round-ctrl">
+                <button class="btn btn-outline" id="prevRound" aria-label="上一輪">‹ 上一輪</button>
+                <span class="round">第<span class="num" id="roundNum">1</span>輪</span>
+                <button class="btn btn-outline" id="nextRound" aria-label="下一輪">下一輪 ›</button>
             </div>
-            
-            <div style="flex: 0.8; display: flex; flex-direction: column; align-items: center;">
-                <div class="vs-text">VS</div>
-                <div style="background: rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 5px; font-size: 0.8em; margin-top: 5px;">
-                    本輪總讚數<br>
-                    <b id="totalLikesDisplay" style="color:#f1c40f; font-size: 1.2em;">0 / 3</b>
+
+            <div class="versus">
+                <div class="side">
+                    <select id="teamA" aria-label="隊伍 A"></select>
+                    <div class="stepper">
+                        <button id="minusA" aria-label="減少 A 隊的讚">−</button>
+                        <span class="count"><span class="num" id="likesA">0</span></span>
+                        <button id="plusA" aria-label="增加 A 隊的讚">+</button>
+                    </div>
+                </div>
+                <div class="vs">VS</div>
+                <div class="side">
+                    <select id="teamB" aria-label="隊伍 B"></select>
+                    <div class="stepper">
+                        <button id="minusB" aria-label="減少 B 隊的讚">−</button>
+                        <span class="count"><span class="num" id="likesB">0</span></span>
+                        <button id="plusB" aria-label="增加 B 隊的讚">+</button>
+                    </div>
+                </div>
+            </div>
+            <p class="hint" style="text-align:center; margin:-4px 0 14px;">兩隊合計讚數 <b id="likesTotal">0 / 3</b></p>
+
+            <div class="field">
+                <label class="label">獲勝隊伍</label>
+                <div class="winner-pick">
+                    <button id="winA">—</button>
+                    <button id="winB">—</button>
                 </div>
             </div>
 
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
-                <select id="teamBSelect" style="padding: 12px; font-size: 1.1em; border-radius: 5px; border: 1px solid #7f8c8d; background: #2c3e50; color: white; font-weight: bold;"></select>
-                <button class="square-btn" id="likeBtnB" style="margin: 0 auto;">👍<br><small id="cntB">0</small></button>
-            </div>
-
+            <button id="submitBtn" class="btn btn-primary btn-block">送出對戰結果</button>
         </div>
 
-        <div class="winner-box">
-            <label style="color:#e74c3c; font-weight:bold; display:block; margin-bottom:5px;">🏆 選擇獲勝隊伍</label>
-            <select id="winnerSelect" style="width:100%; padding:10px; font-size:1.1em; border-radius:5px; border:2px solid #e74c3c; background:#2c3e50; color:white; font-weight:bold;"></select>
-        </div>
-
-        <button id="submitBtn" class="btn-submit">送出對戰戰績 🚀</button>
-
-        <hr style="border-top:1px solid rgba(255,255,255,0.2); margin:20px 0;">
-        <h3 style="margin-top: 0; color:#f1c40f;">📜 本關對戰紀錄</h3>
-        <div id="stationLeaderboard"></div>
+        <h2 class="section-title">本關紀錄</h2>
+        <div class="panel"><ul class="record-list" id="records"></ul></div>
     </div>
+
     <script type="module" src="admin_2.js"></script>
 </body>
 </html>

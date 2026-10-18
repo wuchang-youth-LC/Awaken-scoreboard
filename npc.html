@@ -3,54 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NPC 加分站</title>
+    <title>NPC 加分｜2026 Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <style>
-        body { text-align: center; }
-        .container { background: rgba(15, 20, 30, 0.9); padding: 20px; border-radius: 12px; max-width: 500px; margin: 0 auto; display: none; box-shadow: 0 8px 16px rgba(0,0,0,0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.15); }
-        .npc-badge { background-color: #8e44ad; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; display: inline-block; }
-        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 20, 30, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(10px); }
-        #loginOverlay input { width: 80%; max-width: 300px; text-align: center; margin-bottom: 15px; padding: 12px; font-size: 1.1em; border-radius: 5px; border: none; }
-        
-        /* 🌟 小巧的 4 欄即時分數版 */
-        .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
-        .score-item { background: rgba(255,255,255,0.1); padding: 8px 5px; border-radius: 5px; font-size: 0.9em; font-weight: bold; }
-        .score-item span { display: block; color: #f1c40f; font-size: 1.1em; margin-top: 3px; }
-        
-        .history-list { text-align: left; max-height: 200px; overflow-y: auto; }
-        .history-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; margin-bottom: 5px; border-left: 4px solid #8e44ad; }
-    </style>
 </head>
 <body>
-    <div id="loginOverlay">
-        <h2>👋 歡迎進入 NPC 系統</h2>
-        <input type="text" id="npcNameInput" placeholder="請輸入您的名稱">
-        <button class="btn btn-score" id="loginBtn" style="padding: 12px 30px; font-size: 1.1em;">進入</button>
+    <div class="login" id="login">
+        <div class="big">ALL IN</div>
+        <h1 style="margin:10px 0 4px;">NPC 加分站</h1>
+        <p>輸入名字後，送出的紀錄會掛在你名下</p>
+        <div class="field"><input type="text" id="nameInput" placeholder="你的名字" autocomplete="nickname"></div>
+        <button class="btn btn-primary btn-block" id="loginBtn">進入</button>
     </div>
 
-    <div class="container" id="mainContainer">
-        <h2 style="margin-top:0; color:#8e44ad;">🌟 神秘 NPC 加分站</h2>
-        <div class="npc-badge" id="npcDisplay">身分：未知</div>
+    <div class="phone" id="main" hidden>
+        <header class="page-head">
+            <span class="brand">NPC</span>
+            <h1 id="whoami"></h1>
+            <div class="head-right"><button class="btn btn-ghost" id="logoutBtn">換人</button></div>
+        </header>
 
-        <!-- 🌟 即時分數板 -->
-        <h3 style="color:#f1c40f; margin-top:0; font-size: 1em;">📊 即時積分排行</h3>
-        <div class="score-grid" id="simpleLeaderboard"></div>
-        <hr style="border-top:1px solid rgba(255,255,255,0.1); margin: 15px 0;">
-
-        <!-- 🌟 對齊 Excel 的分類選單 -->
-        <div class="form-row">
-            <div class="form-group"><label>日期</label><select id="daySelect"></select></div>
-            <div class="form-group"><label>項目</label><select id="eventSelect"></select></div>
+        <div class="panel">
+            <div class="row">
+                <div class="field"><label class="label" for="daySelect">日期</label><select id="daySelect"></select></div>
+                <div class="field"><label class="label" for="eventSelect">項目</label><select id="eventSelect"></select></div>
+            </div>
+            <div class="row">
+                <div class="field"><label class="label" for="teamSelect">隊伍</label><select id="teamSelect"></select></div>
+                <div class="field"><label class="label" for="scoreInput">分數（扣分加負號）</label><input type="number" id="scoreInput" inputmode="numeric" placeholder="例如 50 或 -20"></div>
+            </div>
+            <button class="btn btn-primary btn-block" id="submitBtn">送出加分</button>
         </div>
-        <div class="form-row" style="margin-bottom:15px;">
-            <div class="form-group" style="margin-bottom:0;"><label>隊伍</label><select id="teamSelect"></select></div>
-            <div class="form-group" style="margin-bottom:0;"><label>分數 (+/-)</label><input type="number" id="bonusScoreInput" placeholder="數值"></div>
-        </div>
-        <button class="btn btn-score" id="submitBtn" style="width:100%; padding:15px; font-size:1.2em; margin-bottom: 20px;">送出加分 ✨</button>
 
-        <!-- 🌟 個人紀錄區 -->
-        <h3 style="color:#f1c40f; text-align:left; font-size: 1em;">📜 我送出的紀錄</h3>
-        <div class="history-list" id="npcHistory"></div>
+        <h2 class="section-title">即時總分</h2>
+        <div class="mini-board" id="board"></div>
+
+        <h2 class="section-title">我送出的紀錄</h2>
+        <div class="panel"><ul class="record-list" id="history"></ul></div>
     </div>
 
     <script type="module" src="npc.js"></script>

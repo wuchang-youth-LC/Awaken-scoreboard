@@ -1,168 +1,154 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// D3 關主頁：網址帶 ?station=N
+// 目前輪次存在資料庫（d3_currRounds），重新整理頁面不會跳回第 1 輪
+import { watchSettings, watchCollection, patchSettings, commit, collection, addDoc, deleteDoc, doc, db } from "./firebase.js";
+import { d3Match } from "./scoring.js";
+import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge, overlay, stationFromUrl } from "./ui.js";
 
-const firebaseConfig = { apiKey: "AIzaSyBo5iMRonG0rFu6ZuIBJFXzwnWF9xiAKgQ", authDomain: "awaken-c5fca.firebaseapp.com", projectId: "awaken-c5fca", storageBucket: "awaken-c5fca.firebasestorage.app" };
-const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const urlParams = new URLSearchParams(window.location.search); const currentStation = parseInt(urlParams.get('station')) || 1;
+const station = stationFromUrl();
+let settings = null, records = [];
+let busy = false, round = null, likesA = 0, likesB = 0, winner = null;
 
-let sysSettings = null, isOccupied = false;
-let currentRound = 1, likesA = 0, likesB = 0;
+const setOnline = connectionBadge();
+const showLock = overlay(`<div class="title">輸入已鎖定</div><div class="sub">等待總控台開放</div>`);
 
-// 🔒 鎖定遮罩
-const lockOverlay = document.createElement('div');
-lockOverlay.style = "display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); color:white; z-index:9999; flex-direction:column; justify-content:center; align-items:center; font-size:2em; font-weight:bold; backdrop-filter:blur(10px);";
-lockOverlay.innerHTML = "🔒<br>輸入已鎖定<br><span style='font-size:0.5em; color:#ccc; margin-top:10px;'>等待總控台開放</span>";
-document.body.appendChild(lockOverlay);
+const teamA = () => $("teamA").value;
+const teamB = () => $("teamB").value;
 
-// 🌟 更新輪次，並且推送到資料庫給總控台看
-function updateRoundUI() {
-    document.getElementById('roundText').innerText = `第 ${currentRound} 輪`;
-    likesA = 0; likesB = 0; 
-    updateLikeUI(); 
-    
-    if(sysSettings && sysSettings.schedule && sysSettings.schedule[currentRound] && sysSettings.schedule[currentRound][currentStation]) {
-        const m = sysSettings.schedule[currentRound][currentStation];
-        document.getElementById('teamASelect').value = m.a;
-        document.getElementById('teamBSelect').value = m.b;
-    }
-    updateWinnerSelect();
-
-    // 🌟 精準推播目前輪次，解決總控台不會跟著變的問題
-    if(sysSettings) {
-        let fieldName = `d3_currRounds.${currentStation}`;
-        updateDoc(doc(db, "settings_global", "global"), { [fieldName]: currentRound }).catch(e=>{});
-    }
+function renderStatus() {
+    const btn = $("statusBtn");
+    btn.className = `status-toggle ${busy ? "busy" : ""}`;
+    btn.innerHTML = busy
+        ? `<span class="dot" style="background:#fff"></span>對戰中 <small>點一下改回空關</small>`
+        : `<span class="dot dot-free"></span>目前空關 <small>隊伍到了點一下開始</small>`;
+    renderLikes();
 }
 
-// 更新按讚UI與防呆限制
-function updateLikeUI() {
-    // 🌟 正確抓取 d3_maxLikes
-    const max = (sysSettings && sysSettings.d3_maxLikes) ? sysSettings.d3_maxLikes : 3;
-    let totalGiven = likesA + likesB;
-
-    document.getElementById('cntA').innerText = `${likesA}`;
-    document.getElementById('cntB').innerText = `${likesB}`;
-    document.getElementById('totalLikesDisplay').innerText = `${totalGiven} / ${max}`;
-
-    // 超過總和就鎖住
-    document.getElementById('likeBtnA').disabled = (!isOccupied || totalGiven >= max);
-    document.getElementById('likeBtnB').disabled = (!isOccupied || totalGiven >= max);
+function renderLikes() {
+    const max = settings ? settings.d3_maxLikes : 3;
+    const full = likesA + likesB >= max;
+    $("likesA").textContent = likesA;
+    $("likesB").textContent = likesB;
+    $("likesTotal").textContent = `${likesA + likesB} / ${max}`;
+    $("plusA").disabled = $("plusB").disabled = !busy || full;
+    $("minusA").disabled = !busy || likesA <= 0;
+    $("minusB").disabled = !busy || likesB <= 0;
 }
 
-document.getElementById('prevRoundBtn').addEventListener('click', () => { if(currentRound > 1) { currentRound--; updateRoundUI(); }});
-document.getElementById('nextRoundBtn').addEventListener('click', () => { 
-    let maxR = sysSettings.d3_maxRounds || 7;
-    if(currentRound < maxR) { currentRound++; updateRoundUI(); }
-});
-
-// --- 替換這一段 ---
-document.getElementById('likeBtnA').addEventListener('click', () => {
-    if (!isOccupied) return alert("請切換為🔴闖關中");
-    const max = (sysSettings && sysSettings.d3_maxLikes) ? sysSettings.d3_maxLikes : 3;
-    if (likesA + likesB < max) {
-        likesA++; updateLikeUI();
-    } else {
-        alert(`❌ 兩隊相加最多只能給 ${max} 個讚！`);
-    }
-});
-
-document.getElementById('likeBtnB').addEventListener('click', () => {
-    if (!isOccupied) return alert("請切換為🔴闖關中");
-    const max = (sysSettings && sysSettings.d3_maxLikes) ? sysSettings.d3_maxLikes : 3;
-    if (likesA + likesB < max) {
-        likesB++; updateLikeUI();
-    } else {
-        alert(`❌ 兩隊相加最多只能給 ${max} 個讚！`);
-    }
-});
-// --- 替換到這裡 ---
-
-function updateWinnerSelect() {
-    const a = document.getElementById('teamASelect').value, b = document.getElementById('teamBSelect').value;
-    document.getElementById('winnerSelect').innerHTML = `<option value="${a}">${a}</option><option value="${b}">${b}</option>`;
+function renderWinner() {
+    if (winner !== teamA() && winner !== teamB()) winner = null;
+    $("winA").textContent = teamA();
+    $("winB").textContent = teamB();
+    $("winA").classList.toggle("picked", winner !== null && winner === teamA());
+    $("winB").classList.toggle("picked", winner !== null && winner === teamB());
 }
-document.getElementById('teamASelect').addEventListener('change', updateWinnerSelect);
-document.getElementById('teamBSelect').addEventListener('change', updateWinnerSelect);
 
-// 燈號控制
-const statusBtn = document.getElementById('statusToggleBtn');
-statusBtn.addEventListener('click', async () => {
-    isOccupied = !isOccupied;
-    let newStatus = { ...sysSettings.d3_status };
-    newStatus[currentStation] = isOccupied ? 'red' : 'green';
-    statusBtn.innerText = "更新中...";
-    if (isOccupied) { likesA = 0; likesB = 0; } // 切換紅燈清空
-    await updateDoc(doc(db, "settings_global", "global"), { d3_status: newStatus });
+// 換輪時：依賽程表帶入兩隊、清空讚數與勝方
+function enterRound(next) {
+    round = next;
+    likesA = likesB = 0;
+    winner = null;
+    $("roundNum").textContent = round;
+    const m = d3Match(settings, round, station);
+    if (m) { $("teamA").value = m.a; $("teamB").value = m.b; }
+    renderLikes();
+    renderWinner();
+}
+
+function renderRecords() {
+    const mine = records.filter(r => r.station === station).sort((a, b) => b.createdAt - a.createdAt);
+    $("records").innerHTML = mine.length
+        ? mine.map(r => `
+            <li>
+                <div>
+                    <div class="main">第 ${r.round} 輪　${esc(r.teamA)} vs ${esc(r.teamB)}</div>
+                    <div class="meta">勝：${esc(r.winner)}・讚 ${r.likesA || 0} : ${r.likesB || 0}</div>
+                </div>
+                <button class="btn btn-ghost danger" data-del="${esc(r.id)}">刪除</button>
+            </li>`).join("")
+        : `<li class="empty">尚無紀錄</li>`;
+}
+
+function changeRound(next) {
+    if (next < 1 || next > settings.d3_maxRounds) return;
+    enterRound(next);
+    patchSettings({ [`d3_currRounds.${station}`]: next }).catch(() => toast("輪次同步失敗", "error"));
+}
+
+async function setBusy(next) {
+    busy = next;
+    if (busy) { likesA = likesB = 0; }
+    renderStatus();
+    await patchSettings({ [`d3_status.${station}`]: busy ? "red" : "green" });
+}
+
+$("statusBtn").addEventListener("click", () => setBusy(!busy).catch(() => toast("燈號更新失敗，請再試一次", "error")));
+$("prevRound").addEventListener("click", () => changeRound(round - 1));
+$("nextRound").addEventListener("click", () => changeRound(round + 1));
+$("plusA").addEventListener("click", () => { likesA++; renderLikes(); });
+$("plusB").addEventListener("click", () => { likesB++; renderLikes(); });
+$("minusA").addEventListener("click", () => { likesA--; renderLikes(); });
+$("minusB").addEventListener("click", () => { likesB--; renderLikes(); });
+$("teamA").addEventListener("change", renderWinner);
+$("teamB").addEventListener("change", renderWinner);
+$("winA").addEventListener("click", () => { winner = teamA(); renderWinner(); });
+$("winB").addEventListener("click", () => { winner = teamB(); renderWinner(); });
+
+$("records").addEventListener("click", async e => {
+    const id = e.target.closest("[data-del]")?.dataset.del;
+    if (id && confirm("確定刪除這筆對戰紀錄？")) await deleteDoc(doc(db, "records_d3", id));
 });
 
-onSnapshot(doc(db, "settings_global", "global"), (docSnap) => {
-    if (docSnap.exists()) {
-        sysSettings = docSnap.data();
-        lockOverlay.style.display = sysSettings.d3_locked ? "flex" : "none";
+$("submitBtn").addEventListener("click", async () => {
+    if (!busy) return toast("請先點上方按鈕切換為「對戰中」", "warn");
+    const a = teamA(), b = teamB();
+    if (a === b) return toast("兩隊不能是同一隊", "warn");
+    if (!winner) return toast("請選擇獲勝隊伍", "warn");
 
-        isOccupied = (sysSettings.d3_status && sysSettings.d3_status[currentStation] === 'red');
-        statusBtn.className = isOccupied ? "status-btn status-red" : "status-btn status-green";
-        statusBtn.innerText = isOccupied ? "🔴 闖關中 (點擊切換空關)" : "🟢 目前為空關 (點擊開始)";
-        updateLikeUI();
+    const dup = records.some(r => r.station === station && r.round === round);
+    const msg = `${dup ? "注意：這一輪已經有紀錄了！\n\n" : ""}確認送出第 ${round} 輪？\n${a}（讚 ${likesA}） vs ${b}（讚 ${likesB}）\n勝：${winner}`;
+    if (!confirm(msg)) return;
 
-        document.getElementById('stationDisplay').innerText = `第 ${currentStation} 關 (⚔️ PK對抗)`;
-        const tA = document.getElementById('teamASelect'), tB = document.getElementById('teamBSelect');
-        if (tA.options.length === 0) {
-            for (let i = 1; i <= (sysSettings.numTeams || 15); i++) {
-                let opt = `<option value="第${i}隊">第 ${i} 隊</option>`;
-                tA.innerHTML += opt; tB.innerHTML += opt;
-            }
-            updateRoundUI(); // 初次載入
-        }
-    }
-});
-
-onSnapshot(collection(db, "records_d3"), (snapshot) => {
-    const board = document.getElementById('stationLeaderboard'); board.innerHTML = "";
-    let records = []; snapshot.forEach(d => records.push({ id: d.id, ...d.data() }));
-
-    let stRecs = records.filter(r => r.station === currentStation).sort((a, b) => b.createdAt - a.createdAt);
-    if (stRecs.length === 0) { board.innerHTML = "<p style='color:#888;'>尚無成績</p>"; return; }
-
-    stRecs.forEach(r => {
-        const item = document.createElement('div'); item.className = 'record-item';
-         item.innerHTML = `<span>[輪${r.round}] <b>${r.teamA} VS ${r.teamB}</b><br><span style="color:#e74c3c;">👉 ${r.winner} 勝</span> <small style="color:#aaa;">(👍A:${r.likesA} B:${r.likesB})</small></span><button class="delete-btn" data-id="${r.id}">刪除</button>`;
-        board.appendChild(item);
-    });
-    document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', async (e) => {
-        if (confirm("刪除？")) await deleteDoc(doc(db, "records_d3", e.target.getAttribute('data-id')));
-    }));
-});
-
-document.getElementById('submitBtn').addEventListener('click', async () => {
-    if (!isOccupied) return alert("❌ 請切換為「🔴 闖關中」才能送出！");
-    const teamA = document.getElementById('teamASelect').value, teamB = document.getElementById('teamBSelect').value;
-    if (teamA === teamB) return alert("❌ 隊伍不能相同！");
-    const winner = document.getElementById('winnerSelect').value;
-
+    $("submitBtn").disabled = true;
     try {
-        document.getElementById('submitBtn').disabled = true;
-        
-        // 1. 送出戰績
-        await addDoc(collection(db, "records_d3"), { 
-            station: currentStation, round: currentRound, teamA, teamB, winner, 
-            loser: (winner === teamA ? teamB : teamA), 
-            likesA, likesB, createdAt: Date.now() 
-        });
-
-        // 2. 手動修改為綠燈 (不使用 click() 避免非同步衝突報錯)
-        isOccupied = false;
-        let newStatus = { ...sysSettings.d3_status };
-        newStatus[currentStation] = 'green';
-        await updateDoc(doc(db, "settings_global", "global"), { d3_status: newStatus });
-        
-        alert("✅ 送出成功！即將自動跳至下一輪");
-        let maxR = sysSettings.d3_maxRounds || 7;
-        if(currentRound < maxR) {
-            currentRound++; updateRoundUI(); // 自動跳轉下一輪
-        }
-    } catch (error) { 
-        alert("發生錯誤，請檢查網路！"); 
+        const result = await commit(addDoc(collection(db, "records_d3"), {
+            station, round, teamA: a, teamB: b, winner, loser: winner === a ? b : a,
+            likesA, likesB, createdAt: Date.now()
+        }));
+        // 送出後：燈號改回空關，自動跳下一輪
+        const nextRound = Math.min(round + 1, settings.d3_maxRounds);
+        busy = false;
+        await commit(patchSettings({ [`d3_status.${station}`]: "green", [`d3_currRounds.${station}`]: nextRound }));
+        const last = nextRound === round;
+        enterRound(nextRound);
+        renderStatus();
+        toastCommit(result, last ? "已送出，這是最後一輪" : `已送出，進入第 ${nextRound} 輪`);
+    } catch (err) {
+        console.error(err);
+        toast("送出失敗，請檢查網路後再試", "error");
+    } finally {
+        $("submitBtn").disabled = false;
     }
-    document.getElementById('submitBtn').disabled = false;
 });
+
+watchSettings((s, online) => {
+    settings = s;
+    setOnline(online);
+    showLock(s.d3_locked);
+    busy = s.d3_status[station] === "red";
+    $("stationTitle").textContent = `第 ${station} 關・PK 對抗`;
+
+    const firstLoad = $("teamA").options.length === 0;
+    fillTeamSelect($("teamA"), s.numTeams);
+    fillTeamSelect($("teamB"), s.numTeams);
+    if (firstLoad) $("teamB").selectedIndex = Math.min(1, s.numTeams - 1);
+
+    // 輪次以資料庫為準（同一關有兩支手機時也會同步）
+    const serverRound = Math.min(s.d3_currRounds[station] || 1, s.d3_maxRounds);
+    if (serverRound !== round) enterRound(serverRound);
+
+    renderStatus();
+    renderWinner();
+    renderRecords();
+});
+
+watchCollection("records_d3", list => { records = list; renderRecords(); });
