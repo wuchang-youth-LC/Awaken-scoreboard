@@ -18,6 +18,7 @@ const authReady = new Promise(resolve => {
 const sessionRef = uid => doc(db, "sessions", uid);
 
 const AUTH_ERRORS = {
+    "auth/configuration-not-found": "後台還沒啟用登入功能（Authentication），請聯絡計分組",
     "auth/admin-restricted-operation": "後台還沒開啟「匿名」登入方式，請聯絡計分組",
     "auth/operation-not-allowed": "後台還沒開啟這種登入方式，請聯絡計分組",
     "auth/invalid-credential": "帳號或密碼錯誤",
