@@ -14,12 +14,14 @@
     <header class="page-head">
         <span class="brand">ALL IN</span>
         <h1>營會總控台</h1>
+        <div class="head-right"><span class="hint" id="adminWho"></span><button class="btn btn-ghost" id="adminLogout">登出</button></div>
     </header>
 
     <nav class="tabs" role="tablist">
         <button class="tab active" data-tab="d2-panel">D2 自由闖關</button>
         <button class="tab" data-tab="d3-panel">D3 PK 對抗</button>
         <button class="tab" data-tab="score-panel">總積分</button>
+        <button class="tab" data-tab="staff-panel">工作人員</button>
     </nav>
 
     <!-- D2 -->
@@ -69,6 +71,27 @@
                 <thead id="tableHead"></thead>
                 <tbody id="tableBody"></tbody>
             </table>
+        </div>
+    </section>
+
+    <!-- 工作人員 -->
+    <section id="staff-panel" class="tab-panel" hidden>
+        <div class="toolbar">
+            <button class="btn btn-primary" id="saveRosterBtn">儲存名單</button>
+            <span class="state">每一關填負責的關主名字，可以填好幾個，用逗號分隔。關主登入時輸入的名字要完全一樣。</span>
+        </div>
+        <div class="panel" style="margin-bottom:12px;">
+            <h2 class="section-title" style="margin-top:0;">D2 關主</h2>
+            <div class="roster-grid" id="roster_d2"></div>
+            <h2 class="section-title">D3 關主</h2>
+            <div class="roster-grid" id="roster_d3"></div>
+            <h2 class="section-title">NPC</h2>
+            <div class="field"><input type="text" id="roster_npc" placeholder="例如：王小明, 李大華"></div>
+            <p class="hint">工作人員入口：<b id="staffUrl"></b>（把這個網址傳給關主就好）</p>
+        </div>
+        <div class="panel">
+            <h2 class="section-title" style="margin-top:0;">目前登入中</h2>
+            <ul class="record-list online-list" id="sessionList"></ul>
         </div>
     </section>
 </div>

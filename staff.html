@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工作人員入口｜Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="phone">
+        <header class="page-head">
+            <span class="brand">ALL IN</span>
+            <h1>工作人員入口</h1>
+        </header>
+        <p class="hint" style="margin-bottom:6px;">選你負責的關卡，再輸入你的名字。</p>
+
+        <h2 class="section-title">D2 自由闖關</h2>
+        <div class="entry-grid" id="d2"></div>
+
+        <h2 class="section-title">D3 PK 對抗</h2>
+        <div class="entry-grid" id="d3"></div>
+
+        <h2 class="section-title">其他</h2>
+        <div class="entry-grid">
+            <a class="entry" href="npc.html">NPC 加分</a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { watchSettings } from "./firebase.js";
+        import { $ } from "./ui.js";
+
+        const links = (page, n) => Array.from({ length: n }, (_, i) =>
+            `<a class="entry" href="${page}?station=${i + 1}">第 <span class="num">${i + 1}</span> 關</a>`).join("");
+
+        watchSettings(s => {
+            $("d2").innerHTML = links("admin.html", s.numStations_d2);
+            $("d3").innerHTML = links("admin_2.html", s.numStations_d3);
+        });
+    </script>
+</body>
+</html>

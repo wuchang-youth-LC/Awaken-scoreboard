@@ -1,9 +1,15 @@
 // D2 關主頁：網址帶 ?station=N
 import { watchSettings, watchCollection, patchSettings, commit, collection, addDoc, deleteDoc, doc, db } from "./firebase.js";
 import { d2StationConfig, formatD2Value, formatTime, clampInt, d2MaxVal } from "./scoring.js";
-import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge, overlay, stationFromUrl } from "./ui.js";
+import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge, overlay, stationFromUrl, failText } from "./ui.js";
+import { requireStaff, logoutStaff } from "./auth.js";
 
 const station = stationFromUrl();
+
+// 先登入：名字要在總控台的名單裡
+const session = await requireStaff("d2", station);
+$("whoami").textContent = session.name;
+$("logoutBtn").addEventListener("click", () => { if (confirm("確定要登出？")) logoutStaff(); });
 let settings = null, conf = { type: "time", unit: "" };
 let busy = false, likes = 0, records = [];
 
@@ -97,7 +103,7 @@ $("submitBtn").addEventListener("click", async () => {
         toastCommit(result, `${team} 成績已送出`);
     } catch (err) {
         console.error(err);
-        toast("送出失敗，請檢查網路後再試", "error");
+        toast(failText(err), "error");
     } finally {
         $("submitBtn").disabled = false;
     }

@@ -496,3 +496,34 @@ input[type="number"] { -moz-appearance: textfield; }
 .score-table .day-start { border-left: 2px solid var(--line-strong); }
 .score-table .game { color: var(--blue-soft); font-weight: 700; }
 .score-table .uncat { color: var(--orange); font-weight: 700; }
+
+/* ---------- 登入畫面、工作人員入口 ---------- */
+
+.gate { z-index: 950; overflow-y: auto; justify-content: flex-start; }
+.gate .login { width: 100%; margin: 10vh auto 0; }
+.gate-title { margin: 10px 0 4px; font-size: 1.4rem; }
+.gate-note { font-size: 0.85rem; color: var(--cream); border: 1.5px solid var(--orange); border-radius: var(--radius); padding: 8px 10px; }
+.gate-error { min-height: 1.5em; margin: 10px 0 0; color: #ff9a8a; font-weight: 700; }
+.gate a, .entry-grid a { color: inherit; }
+.gate .hint a { color: var(--blue-soft); }
+
+.entry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.entry {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 6px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--panel);
+    font-weight: 700;
+    text-decoration: none;
+}
+.entry .num { font-size: 1.3em; margin: 0 3px; color: var(--orange); }
+.entry:hover { border-color: var(--orange); }
+
+/* 總控台：工作人員名單 */
+.roster-grid { display: grid; gap: 8px 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.roster-row { display: grid; grid-template-columns: 4.5em 1fr; gap: 8px; align-items: center; }
+.roster-row label { font-weight: 700; color: var(--orange); }
+.online-list .who { font-weight: 700; }

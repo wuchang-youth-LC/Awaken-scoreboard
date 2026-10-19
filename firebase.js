@@ -2,12 +2,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-    collection, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc, writeBatch
+    collection, doc, onSnapshot, getDoc, addDoc, updateDoc, setDoc, deleteDoc, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { firebaseConfig } from "./config.js";
 import { withDefaults } from "./scoring.js";
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 
 // 離線快取：營地訊號不好時，資料先存在手機，恢復連線後自動上傳
 export const db = initializeFirestore(app, {
@@ -15,7 +15,7 @@ export const db = initializeFirestore(app, {
 });
 
 export const settingsRef = doc(db, "settings_global", "global");
-export { collection, doc, addDoc, updateDoc, setDoc, deleteDoc };
+export { collection, doc, onSnapshot, getDoc, addDoc, updateDoc, setDoc, deleteDoc, writeBatch };
 
 // 監聽全域設定；callback 收到的設定已補好預設值
 // 第二個參數 online：false 代表目前讀的是手機快取（離線中）
@@ -25,10 +25,10 @@ export function watchSettings(callback) {
     });
 }
 
-export function watchCollection(name, callback) {
+export function watchCollection(name, callback, onError = err => console.error(name, err)) {
     return onSnapshot(collection(db, name), snap => {
         callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, onError);
 }
 
 // 只更新設定裡的某幾個欄位（例如 "d2_status.3"），不會蓋掉其他關主同時寫入的資料

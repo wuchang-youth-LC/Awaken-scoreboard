@@ -1,0 +1,133 @@
+rules_version = '2';
+
+// 權限設計
+// - 任何人：可以讀排行榜需要的資料（設定、成績、加分）
+// - 管理員：用 email/密碼登入，UID 列在下面的 adminUids，可以改所有東西
+// - 關主 / NPC：匿名登入後，輸入的名字要在總控台設定的名單（staff 集合）裡，
+//   通過後會有一筆 sessions/{uid}，之後只能寫自己那一關的資料
+//
+// 新增管理員：在 Firebase 後台 Authentication 建立帳號，把 UID 加進 adminUids，
+// 然後執行 firebase deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function adminUids() {
+      return [];
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.uid in adminUids();
+    }
+
+    function sessionPath() {
+      return /databases/$(database)/documents/sessions/$(request.auth.uid);
+    }
+
+    function rosterKey(s) {
+      return s.role == 'npc' ? 'npc' : s.role + '_' + string(s.station);
+    }
+
+    function inRoster(s) {
+      let roster = /databases/$(database)/documents/staff/$(rosterKey(s));
+      return exists(roster) && s.name in get(roster).data.names;
+    }
+
+    // 目前登入者是不是這個角色的有效工作人員（名字被總控台移除就立刻失效）
+    function staffAs(role) {
+      return request.auth != null
+        && exists(sessionPath())
+        && get(sessionPath()).data.role == role
+        && inRoster(get(sessionPath()).data);
+    }
+
+    function myStation() {
+      return get(sessionPath()).data.station;
+    }
+
+    function onlyChangedKey(field, station) {
+      return request.resource.data.get(field, {})
+        .diff(resource.data.get(field, {}))
+        .affectedKeys().hasOnly([string(station)]);
+    }
+
+    function isCount(v) {
+      return v is int && v >= 0 && v <= 20;
+    }
+
+    // ---------- 全域設定 ----------
+    match /settings_global/global {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (staffAs('d2')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['d2_status'])
+            && onlyChangedKey('d2_status', myStation()))
+        || (staffAs('d3')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['d3_status', 'd3_currRounds'])
+            && onlyChangedKey('d3_status', myStation())
+            && onlyChangedKey('d3_currRounds', myStation()));
+    }
+
+    // ---------- D2 成績 ----------
+    match /records_d2/{id} {
+      allow read: if true;
+      allow create: if isAdmin()
+        || (staffAs('d2')
+            && request.resource.data.keys().hasOnly(['station', 'team', 'val', 'likes', 'createdAt'])
+            && request.resource.data.station == myStation()
+            && request.resource.data.team is string
+            && request.resource.data.val is number && request.resource.data.val >= 0
+            && isCount(request.resource.data.likes));
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (staffAs('d2') && resource.data.station == myStation());
+    }
+
+    // ---------- D3 成績 ----------
+    match /records_d3/{id} {
+      allow read: if true;
+      allow create: if isAdmin()
+        || (staffAs('d3')
+            && request.resource.data.keys().hasOnly(['station', 'round', 'teamA', 'teamB', 'winner', 'loser', 'likesA', 'likesB', 'createdAt'])
+            && request.resource.data.station == myStation()
+            && request.resource.data.round is int && request.resource.data.round >= 1
+            && request.resource.data.teamA is string && request.resource.data.teamB is string
+            && request.resource.data.winner in [request.resource.data.teamA, request.resource.data.teamB]
+            && isCount(request.resource.data.likesA) && isCount(request.resource.data.likesB));
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (staffAs('d3') && resource.data.station == myStation());
+    }
+
+    // ---------- 加分 ----------
+    match /records_bonus/{id} {
+      allow read: if true;
+      allow create: if isAdmin()
+        || (staffAs('npc')
+            && request.resource.data.keys().hasOnly(['team', 'reason', 'val', 'npc', 'timestamp'])
+            && request.resource.data.npc == get(sessionPath()).data.name
+            && request.resource.data.team is string
+            && request.resource.data.reason is string
+            && request.resource.data.val is int);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (staffAs('npc') && resource.data.npc == get(sessionPath()).data.name);
+    }
+
+    // ---------- 工作人員名單（只有管理員看得到）----------
+    match /staff/{key} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---------- 登入紀錄 ----------
+    match /sessions/{uid} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['role', 'station', 'name', 'createdAt'])
+        && request.resource.data.role in ['d2', 'd3', 'npc']
+        && request.resource.data.station is int
+        && request.resource.data.name is string
+        && inRoster(request.resource.data);
+      allow delete: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+    }
+  }
+}

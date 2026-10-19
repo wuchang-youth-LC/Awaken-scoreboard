@@ -2,43 +2,19 @@
 import { watchSettings, watchCollection, commit, collection, addDoc, deleteDoc, doc, db } from "./firebase.js";
 import { computeTotals, campColumns } from "./scoring.js";
 import { D2_COLUMN, D3_COLUMN } from "./config.js";
-import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge } from "./ui.js";
+import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge, failText } from "./ui.js";
+import { requireStaff, logoutStaff } from "./auth.js";
 
-const NAME_KEY = "awaken_npc_name";
 let settings = null, recordsD2 = [], recordsD3 = [], recordsBonus = [];
-let npcName = "";
+
+// 先登入：名字要在總控台的 NPC 名單裡
+const session = await requireStaff("npc", 0);
+const npcName = session.name;
+$("whoami").textContent = npcName;
+$("main").hidden = false;
+$("logoutBtn").addEventListener("click", () => { if (confirm("確定要登出？")) logoutStaff(); });
 
 const setOnline = connectionBadge();
-
-function readSavedName() {
-    try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; }
-}
-function saveName(name) {
-    try { name ? localStorage.setItem(NAME_KEY, name) : localStorage.removeItem(NAME_KEY); } catch { /* 無痕模式 */ }
-}
-
-function login(name) {
-    npcName = name;
-    saveName(name);
-    $("whoami").textContent = name;
-    $("login").hidden = true;
-    $("main").hidden = false;
-    renderHistory();
-}
-
-$("loginBtn").addEventListener("click", () => {
-    const name = $("nameInput").value.trim();
-    if (!name) return toast("請輸入名字", "warn");
-    login(name);
-});
-$("nameInput").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
-$("logoutBtn").addEventListener("click", () => {
-    saveName("");
-    npcName = "";
-    $("nameInput").value = "";
-    $("main").hidden = true;
-    $("login").hidden = false;
-});
 
 // 日期 / 項目選單（大地成績由系統自動計算，不給手動選）
 function renderOptions() {
@@ -64,7 +40,6 @@ function renderBoard() {
 }
 
 function renderHistory() {
-    if (!npcName) return;
     const mine = recordsBonus.filter(r => r.npc === npcName).sort((a, b) => b.timestamp - a.timestamp);
     $("history").innerHTML = mine.length
         ? mine.map(r => `
@@ -99,7 +74,7 @@ $("submitBtn").addEventListener("click", async () => {
         toastCommit(result, `${team} ${val > 0 ? "+" : ""}${val} 已送出`);
     } catch (err) {
         console.error(err);
-        toast("送出失敗，請檢查網路後再試", "error");
+        toast(failText(err), "error");
     } finally {
         $("submitBtn").disabled = false;
     }
@@ -116,5 +91,3 @@ watchCollection("records_d2", list => { recordsD2 = list; renderBoard(); });
 watchCollection("records_d3", list => { recordsD3 = list; renderBoard(); });
 watchCollection("records_bonus", list => { recordsBonus = list; renderBoard(); renderHistory(); });
 
-const saved = readSavedName();
-if (saved) login(saved);

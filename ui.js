@@ -39,6 +39,12 @@ export function toastCommit(result, label = "已送出") {
     else toast(label, "ok");
 }
 
+// 寫入失敗時給使用者看的訊息
+export function failText(err) {
+    if (err?.code === "permission-denied") return "沒有權限送出，可能已被移出名單，請聯絡計分組";
+    return "送出失敗，請檢查網路後再試";
+}
+
 // 右下角的連線狀態
 export function connectionBadge() {
     const el = document.createElement("div");

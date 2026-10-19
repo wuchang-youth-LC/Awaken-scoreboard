@@ -1,7 +1,7 @@
 // 總控台：D2 / D3 即時監控、參數設定、總積分大表
 import {
     watchSettings, watchCollection, patchSettings, deleteRecords, commit,
-    collection, doc, addDoc, updateDoc, setDoc, settingsRef, db
+    collection, doc, addDoc, updateDoc, setDoc, getDoc, deleteDoc, writeBatch, settingsRef, db
 } from "./firebase.js";
 import {
     rankD2Station, d2StationConfig, formatD2Value, d3Match, parseSchedule,
@@ -9,10 +9,26 @@ import {
 } from "./scoring.js";
 import { CAMP, D2_COLUMN, D3_COLUMN } from "./config.js";
 import { $, esc, teamOptions, toast, toastCommit, connectionBadge, openModal, closeModal } from "./ui.js";
+import { requireAdmin, logoutAdmin } from "./auth.js";
+import { parseNames, rosterKey, sessionLabel } from "./roster.js";
 
 let settings = null, recordsD2 = [], recordsD3 = [], recordsBonus = [];
 let lastTotals = null;
 const setOnline = connectionBadge();
+
+// 先登入管理員帳號
+const admin = await requireAdmin();
+$("adminWho").textContent = admin.email;
+$("adminLogout").addEventListener("click", () => logoutAdmin());
+
+// 新專案第一次使用：先建立設定文件（關主切換燈號時需要它已經存在）
+try {
+    const first = await getDoc(settingsRef);
+    if (!first.exists()) await setDoc(settingsRef, { createdAt: Date.now() }, { merge: true });
+} catch (err) {
+    console.error(err);
+    toast("這個帳號沒有管理員權限，請確認安全規則裡有這個帳號的 UID", "error");
+}
 
 const fmtTime = ts => ts ? new Date(ts).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
 const int = (id, fallback) => {
@@ -38,6 +54,7 @@ watchSettings((s, online) => {
     renderD2Monitor();
     renderD3Monitor();
     renderTotals();
+    renderRoster();
 });
 watchCollection("records_d2", list => { recordsD2 = list; renderD2Monitor(); renderTotals(); });
 watchCollection("records_d3", list => { recordsD3 = list; renderD3Monitor(); renderTotals(); });
@@ -519,3 +536,72 @@ window.runCornerTest = async () => {
     await Promise.all(jobs);
     toast(`已灌入 ${jobs.length} 筆測試資料`);
 };
+
+// ---------- 工作人員名單與登入中的人 ----------
+
+let roster = {}, sessions = [], rosterDirty = false;
+
+const rosterInput = (role, st) => `
+    <div class="roster-row">
+        <label for="roster_${role}_${st}">第 ${st} 關</label>
+        <input type="text" id="roster_${role}_${st}" data-roster="${rosterKey(role, st)}" value="${esc((roster[rosterKey(role, st)] || []).join(", "))}" placeholder="關主名字">
+    </div>`;
+
+function renderRoster() {
+    if (!settings || rosterDirty) return;
+    $("roster_d2").innerHTML = Array.from({ length: settings.numStations_d2 }, (_, i) => rosterInput("d2", i + 1)).join("");
+    $("roster_d3").innerHTML = Array.from({ length: settings.numStations_d3 }, (_, i) => rosterInput("d3", i + 1)).join("");
+    $("roster_npc").value = (roster.npc || []).join(", ");
+    $("staffUrl").textContent = new URL("staff.html", location.href).href;
+}
+
+function renderSessions() {
+    const inRoster = s => (roster[rosterKey(s.role, s.station)] || []).includes(s.name);
+    const order = { d2: 1, d3: 2, npc: 3 };
+    const list = [...sessions].sort((a, b) => order[a.role] - order[b.role] || a.station - b.station || a.createdAt - b.createdAt);
+    $("sessionList").innerHTML = list.length ? list.map(s => `
+        <li>
+            <div>
+                <div class="who">${esc(sessionLabel(s))}</div>
+                <div class="meta">${fmtTime(s.createdAt)} 登入${inRoster(s) ? "" : "・已不在名單中，無法再送出資料"}</div>
+            </div>
+            <button class="btn btn-ghost danger" data-kick="${esc(s.id)}">強制登出</button>
+        </li>`).join("") : `<li class="empty">目前沒有人登入</li>`;
+}
+
+document.addEventListener("input", e => { if (e.target.closest("#staff-panel input")) rosterDirty = true; });
+
+$("saveRosterBtn").addEventListener("click", async () => {
+    const batch = writeBatch(db);
+    document.querySelectorAll("[data-roster]").forEach(el => {
+        batch.set(doc(db, "staff", el.dataset.roster), { names: parseNames(el.value) });
+    });
+    batch.set(doc(db, "staff", "npc"), { names: parseNames($("roster_npc").value) });
+    try {
+        const result = await commit(batch.commit());
+        rosterDirty = false;
+        renderRoster();
+        toastCommit(result, "名單已儲存");
+    } catch (err) {
+        console.error(err);
+        toast("儲存失敗，請確認網路與管理員權限", "error");
+    }
+});
+
+$("sessionList").addEventListener("click", async e => {
+    const id = e.target.closest("[data-kick]")?.dataset.kick;
+    if (id && confirm("確定要強制登出？對方需要重新輸入名字才能繼續。")) {
+        await commit(deleteDoc(doc(db, "sessions", id)));
+    }
+});
+
+const permissionHint = err => {
+    console.error(err);
+    if (err.code === "permission-denied") toast("讀不到工作人員資料：這個帳號沒有管理員權限", "error");
+};
+watchCollection("staff", list => {
+    roster = Object.fromEntries(list.map(d => [d.id, d.names || []]));
+    renderRoster();
+    renderSessions();
+}, permissionHint);
+watchCollection("sessions", list => { sessions = list; renderSessions(); }, permissionHint);

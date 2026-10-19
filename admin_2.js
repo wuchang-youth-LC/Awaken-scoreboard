@@ -2,9 +2,15 @@
 // 目前輪次存在資料庫（d3_currRounds），重新整理頁面不會跳回第 1 輪
 import { watchSettings, watchCollection, patchSettings, commit, collection, addDoc, deleteDoc, doc, db } from "./firebase.js";
 import { d3Match } from "./scoring.js";
-import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge, overlay, stationFromUrl } from "./ui.js";
+import { $, esc, fillTeamSelect, toast, toastCommit, connectionBadge, overlay, stationFromUrl, failText } from "./ui.js";
+import { requireStaff, logoutStaff } from "./auth.js";
 
 const station = stationFromUrl();
+
+// 先登入：名字要在總控台的名單裡
+const session = await requireStaff("d3", station);
+$("whoami").textContent = session.name;
+$("logoutBtn").addEventListener("click", () => { if (confirm("確定要登出？")) logoutStaff(); });
 let settings = null, records = [];
 let busy = false, round = null, likesA = 0, likesB = 0, winner = null;
 
@@ -124,7 +130,7 @@ $("submitBtn").addEventListener("click", async () => {
         toastCommit(result, last ? "已送出，這是最後一輪" : `已送出，進入第 ${nextRound} 輪`);
     } catch (err) {
         console.error(err);
-        toast("送出失敗，請檢查網路後再試", "error");
+        toast(failText(err), "error");
     } finally {
         $("submitBtn").disabled = false;
     }

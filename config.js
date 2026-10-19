@@ -2,14 +2,16 @@
 // （隊數、關卡數、計分規則等可以在總控台裡改，存在資料庫）
 
 export const firebaseConfig = {
-    apiKey: "AIzaSyBo5iMRonG0rFu6ZuIBJFXzwnWF9xiAKgQ",
-    authDomain: "awaken-c5fca.firebaseapp.com",
-    projectId: "awaken-c5fca",
-    storageBucket: "awaken-c5fca.firebasestorage.app"
+    apiKey: "AIzaSyAV8VfWE6kInFbsoB9shrbcDm9dfJYrOno",
+    authDomain: "awaken-2027.firebaseapp.com",
+    projectId: "awaken-2027",
+    storageBucket: "awaken-2027.firebasestorage.app",
+    messagingSenderId: "445933860545",
+    appId: "1:445933860545:web:0246ddf05c50bc2b688640"
 };
 
 export const CAMP = {
-    name: "2026 Awaken",
+    name: "2027 Awaken",
     theme: "ALL IN",
     // 營會每一天，順序對應資料庫的 cols_d1 ~ cols_d4
     days: ["7/2", "7/3", "7/4", "7/5"]
