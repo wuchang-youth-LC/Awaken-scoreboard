@@ -6,18 +6,21 @@
     <title>D2 排行榜｜2026 Awaken</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="display">
     <header class="page-head">
-        <span class="brand">ALL IN</span>
-        <h1>D2 自由闖關排行榜</h1>
+        <img class="logo" src="assets/logo-awaken.png" alt="AWAKEN">
+        <div class="lockup">
+            <span class="lockup-big">D2</span>
+            <div class="lockup-text"><h1>自由闖關排行榜</h1><span class="lockup-sub" data-camp-title></span></div>
+        </div>
     </header>
 
     <main class="station-grid" id="board"></main>
 
-    <section class="panel likes-board">
+    <section class="likes-board">
         <h2>各隊累積讚數</h2>
         <div class="likes-grid" id="likes"></div>
     </section>

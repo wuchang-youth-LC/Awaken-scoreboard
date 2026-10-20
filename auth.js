@@ -69,7 +69,7 @@ export async function requireStaff(role, station) {
 function staffGate(role, station, otherSession) {
     const title = role === "npc" ? "NPC 加分站" : `${ROLES[role].label}・第 ${station} 關`;
     const g = gate(`
-        <div class="big">ALL IN</div>
+        <img class="wordmark" src="assets/wordmark.jpg" alt="ALL IN">
         <h1 class="gate-title">${esc(title)}</h1>
         <p>請輸入你的名字，要跟計分組登記的一樣</p>
         ${otherSession ? `<p class="gate-note">這支手機目前登入的是：${esc(sessionLabel(otherSession))}<br>登入新的身分後，舊的會自動登出</p>` : ""}
@@ -133,7 +133,7 @@ export async function requireAdmin() {
     try { savedEmail = localStorage.getItem(ADMIN_EMAIL_KEY) || ""; } catch { /* 無痕模式 */ }
 
     const g = gate(`
-        <div class="big">ALL IN</div>
+        <img class="wordmark" src="assets/wordmark.jpg" alt="ALL IN">
         <h1 class="gate-title">總控台</h1>
         <p>計分組管理員登入</p>
         <div class="field"><input type="email" name="email" placeholder="管理員 Email" autocomplete="username" value="${esc(savedEmail)}" required></div>

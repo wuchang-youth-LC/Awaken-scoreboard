@@ -1,5 +1,10 @@
 // 各頁共用的小工具
 import { teamList } from "./scoring.js";
+import { CAMP } from "./config.js";
+
+// 頁首的年份與營會名稱
+document.querySelectorAll("[data-camp-year]").forEach(el => { el.textContent = CAMP.year; });
+document.querySelectorAll("[data-camp-title]").forEach(el => { el.textContent = `${CAMP.year} ${CAMP.title}`; });
 
 export const $ = id => document.getElementById(id);
 

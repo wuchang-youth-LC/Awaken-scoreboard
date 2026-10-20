@@ -6,7 +6,7 @@ import { $, esc, overlay } from "./ui.js";
 let settings = null, records = [];
 
 const showHidden = overlay(`
-    <div class="big">ALL IN</div>
+    <img class="wordmark" src="assets/wordmark.jpg" alt="ALL IN">
     <div class="title">營會成績結算中</div>
     <div class="sub">敬請期待最高榮耀</div>`, "poster");
 
@@ -31,13 +31,14 @@ function render() {
 
         const busy = settings.d2_status[st] === "red";
         cards.push(`
-            <article class="panel station-card">
+            <article class="station-card">
                 <div class="head">
-                    <div>
-                        <div class="st-name">第<span class="num">${st}</span>關</div>
-                        <div class="st-type">${conf.type === "time" ? "計時" : "計分"}</div>
+                    <span class="st-no">${String(st).padStart(2, "0")}</span>
+                    <div class="st-meta">
+                        <span class="st-name">第 ${st} 關</span>
+                        <span class="st-type">${conf.type === "time" ? "TIME 計時" : "SCORE 計分"}</span>
                     </div>
-                    <span class="chip ${busy ? "chip-busy" : ""}"><span class="dot ${busy ? "dot-busy" : "dot-free"}"></span>${busy ? "闖關中" : "空關"}</span>
+                    ${busy ? `<span class="tag">闖關中</span>` : `<span class="tag tag-free">空關</span>`}
                 </div>
                 ${lines.join("")}${tie}
             </article>`);

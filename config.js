@@ -12,6 +12,8 @@ export const firebaseConfig = {
 
 export const CAMP = {
     name: "2027 Awaken",
+    year: 2027,
+    title: "AWAKEN 暑期青年營會",
     theme: "ALL IN",
     // 營會每一天，順序對應資料庫的 cols_d1 ~ cols_d4
     days: ["7/2", "7/3", "7/4", "7/5"]

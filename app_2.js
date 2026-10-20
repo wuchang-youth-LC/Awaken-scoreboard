@@ -6,7 +6,7 @@ import { $, esc, overlay } from "./ui.js";
 let settings = null, records = [];
 
 const showHidden = overlay(`
-    <div class="big">ALL IN</div>
+    <img class="wordmark" src="assets/wordmark.jpg" alt="ALL IN">
     <div class="title">營會成績結算中</div>
     <div class="sub">敬請期待最高榮耀</div>`, "poster");
 
