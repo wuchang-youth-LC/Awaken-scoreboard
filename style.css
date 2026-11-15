@@ -586,3 +586,7 @@ code { font-family: ui-monospace, Consolas, monospace; background: rgba(255, 255
 
 .entry { flex-direction: column; align-items: center; }
 .entry small { font-size: 0.72rem; font-weight: 400; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 分頁列只允許左右捲動，避免右邊出現上下箭頭 */
+.tabs { overflow-y: hidden; }
+.tab { margin-bottom: 0; }
