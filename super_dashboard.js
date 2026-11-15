@@ -2,12 +2,12 @@
 import { watchCollection, commit, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, settingsRef, db } from "./firebase.js";
 import {
     watchCamp, GAME, BONUS, createRecord, updateRecord, deleteRecord, restoreRecord,
-    ensureStateDocs, fetchAudit, clearPracticeData, clearGame, clearStation
+    ensureStateDocs, fetchAudit, clearPracticeData, clearGame, clearBonus, clearStation
 } from "./store.js";
 import {
     GAME_IDS, GAME_LABELS, GAME_TYPES, AUDIT_LABELS, gameConfig, normalizeStation, stationLabel, scheduledTeams,
     validateRecord, recordPoints, resultText, computeCampTotals,
-    parseLevels, formatLevels, parseNumberList, parseScheduleTeams
+    parseLevels, formatLevels, parseNumberList, parseScheduleTeams, studentConfig
 } from "./games.js";
 import { campColumns, resolveBonusKey, teamList, UNCATEGORIZED } from "./scoring.js";
 import { CAMP } from "./config.js";
@@ -430,6 +430,11 @@ function renderBonus() {
 }
 $("bonusShowDeleted").addEventListener("change", renderBonus);
 
+$("clearBonusBtn").addEventListener("click", () => {
+    if (prompt("這會永久刪除全部加分紀錄（包含已刪除的），無法復原。\n請輸入「確認」繼續") !== "確認") return;
+    run(clearBonus().then(n => { toast(`已清空 ${n} 筆`); }));
+});
+
 let editingBonus = null;
 function openBonus(rec) {
     editingBonus = rec;
@@ -527,13 +532,30 @@ function renderSetup() {
     $("set_teams").value = settings.numTeams;
     $("colsFields").innerHTML = campColumns(settings).map((d, i) => `
         <div class="field"><label class="label">${esc(d.day)}</label><input type="text" id="set_cols_d${i + 1}" value="${esc(d.cols.join(","))}"></div>`).join("");
+    $("set_quick").value = (settings.bonusQuick || []).join(", ");
+    const view = studentConfig(settings);
+    $("student_game").value = view.game;
+    $("student_map").checked = view.map;
+    $("student_stations").checked = view.stations;
+    $("student_scores").checked = view.scores;
+    $("studentUrl").textContent = new URL("index.html", location.href).href;
 }
+
+$("saveStudentBtn").addEventListener("click", async () => {
+    const student = {
+        game: $("student_game").value,
+        map: $("student_map").checked,
+        stations: $("student_stations").checked,
+        scores: $("student_scores").checked
+    };
+    if (await run(commit(updateDoc(settingsRef, { student })), "學員頁設定已儲存")) { setupDirty = false; renderSetup(); }
+});
 $("setup-panel").addEventListener("input", () => { setupDirty = true; });
 
 $("saveCampBtn").addEventListener("click", async () => {
     const teams = int("set_teams", settings.numTeams);
     if (teams < 2) return toast("隊伍數至少要 2", "warn");
-    const fields = { numTeams: teams };
+    const fields = { numTeams: teams, bonusQuick: parseNumberList($("set_quick").value).filter(n => Number.isInteger(n) && n !== 0) };
     CAMP.days.forEach((_, i) => { fields[`cols_d${i + 1}`] = $(`set_cols_d${i + 1}`).value.trim(); });
     if (await run(commit(setDoc(settingsRef, fields, { merge: true })), "已儲存")) { setupDirty = false; renderSetup(); }
 });

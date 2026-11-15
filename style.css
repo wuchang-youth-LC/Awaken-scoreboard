@@ -23,6 +23,11 @@
 
     --font-body: "Noto Sans TC", "Microsoft JhengHei", "微軟正黑體", sans-serif;
     --font-display: "Barlow Condensed", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    --on-bright: #061637;        /* 黃色、白色底上的文字 */
+    --on-bright-soft: #0a2457;
+    --field: rgba(4, 14, 38, 0.85);   /* 輸入框、按鈕的底 */
+    --faint: #7f93b8;
+    --soft-red: #ffb39a;
     --track: 0.08em;         /* 海報上「報 名 資 訊」那種字距 */
 }
 
@@ -125,11 +130,11 @@ a { color: var(--sky); }
 .btn-primary:hover:not(:disabled) { background: #f2652f; }
 .btn-outline { border-color: var(--line); }
 .btn-outline:hover:not(:disabled) { border-color: var(--white); }
-.btn-danger { border-color: var(--red); color: #ffb39a; }
+.btn-danger { border-color: var(--red); color: var(--soft-red); }
 .btn-danger:hover:not(:disabled) { background: var(--red); color: var(--white); }
 .btn-ghost { color: var(--muted); padding: 4px 8px; font-size: 0.85rem; }
 .btn-ghost:hover { color: var(--white); }
-.btn-ghost.danger:hover { color: #ffb39a; }
+.btn-ghost.danger:hover { color: var(--soft-red); }
 .btn-block { width: 100%; padding: 15px; font-size: 1.1rem; letter-spacing: 0.2em; }
 
 input, select, textarea {
@@ -137,13 +142,13 @@ input, select, textarea {
     padding: 11px 12px;
     border-radius: 2px;
     border: 1.5px solid var(--line);
-    background: rgba(4, 14, 38, 0.85);
+    background: var(--field);
     color: var(--white);
     font-weight: 700;
     font-size: 1rem;
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--yellow); }
-input::placeholder { color: #6f84aa; font-weight: 400; }
+input::placeholder { color: var(--faint); font-weight: 400; }
 textarea { font-family: ui-monospace, Consolas, monospace; font-weight: 400; font-size: 0.85rem; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -160,7 +165,7 @@ input[type="number"] { -moz-appearance: textfield; }
     display: inline-block;
     padding: 1px 8px;
     background: var(--yellow);
-    color: var(--ink);
+    color: var(--on-bright);
     font-size: 0.8rem;
     font-weight: 900;
     letter-spacing: var(--track);
@@ -170,7 +175,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
 /* 總控台、關主頁沿用的 chip（樣式同 tag） */
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--muted); white-space: nowrap; letter-spacing: var(--track); }
-.chip-busy { background: var(--yellow); color: var(--ink); font-weight: 900; padding: 1px 8px; }
+.chip-busy { background: var(--yellow); color: var(--on-bright); font-weight: 900; padding: 1px 8px; }
 .chip-busy .dot { display: none; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .dot-free { background: var(--ok); }
@@ -302,7 +307,7 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .rank-line:last-of-type { border-bottom: none; }
 .rank-line .val { margin-left: auto; font-size: 1.2em; }
-.rank-line.none { color: #7f93b8; font-weight: 400; }
+.rank-line.none { color: var(--faint); font-weight: 400; }
 .tie-note { font-size: 0.75rem; color: var(--muted); }
 
 .likes-board { margin-top: 30px; }
@@ -357,8 +362,8 @@ input[type="number"] { -moz-appearance: textfield; }
     letter-spacing: var(--track);
 }
 .status-toggle small { font-weight: 400; color: var(--muted); font-size: 0.8rem; letter-spacing: 0; }
-.status-toggle.busy { border-color: var(--yellow); background: var(--yellow); color: var(--ink); }
-.status-toggle.busy small { color: var(--navy); }
+.status-toggle.busy { border-color: var(--yellow); background: var(--yellow); color: var(--on-bright); }
+.status-toggle.busy small { color: var(--on-bright-soft); }
 .status-toggle.busy .dot { background: var(--ink) !important; }
 
 .time-row { display: flex; align-items: center; gap: 8px; }
@@ -366,7 +371,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .time-row span { font-weight: 700; color: var(--muted); }
 
 .stepper { display: flex; align-items: center; gap: 10px; }
-.stepper button { width: 46px; height: 46px; border: 1.5px solid var(--line); background: rgba(4, 14, 38, 0.85); font-size: 1.4rem; font-weight: 700; }
+.stepper button { width: 46px; height: 46px; border: 1.5px solid var(--line); background: var(--field); font-size: 1.4rem; font-weight: 700; }
 .stepper button:disabled { opacity: 0.35; cursor: not-allowed; }
 .stepper .count { min-width: 3.2em; text-align: center; font-size: 1.2rem; }
 .stepper .count .num { color: var(--orange); font-size: 1.5em; }
@@ -385,8 +390,8 @@ input[type="number"] { -moz-appearance: textfield; }
 .versus .stepper .count { min-width: 2em; }
 
 .winner-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.winner-pick button { padding: 14px 8px; border: 1.5px solid var(--line); background: rgba(4, 14, 38, 0.85); font-weight: 900; font-size: 1.05rem; }
-.winner-pick button.picked { background: var(--yellow); border-color: var(--yellow); color: var(--ink); }
+.winner-pick button { padding: 14px 8px; border: 1.5px solid var(--line); background: var(--field); font-weight: 900; font-size: 1.05rem; }
+.winner-pick button.picked { background: var(--yellow); border-color: var(--yellow); color: var(--on-bright); }
 
 .record-list { list-style: none; margin: 0; padding: 0; }
 .record-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 0.95rem; }
@@ -434,8 +439,8 @@ input[type="number"] { -moz-appearance: textfield; }
 .score-table thead tr:first-child th { color: var(--white); font-family: var(--font-display); font-size: 1rem; border-bottom: 1px solid var(--line); }
 .score-table tbody tr:hover td { background: rgba(255, 255, 255, 0.07); }
 .score-table .sticky-1 { position: sticky; left: 0; z-index: 2; min-width: 72px; background: var(--navy); font-family: var(--font-body); font-size: 0.9rem; font-weight: 700; }
-.score-table .sticky-2 { position: sticky; left: 72px; z-index: 2; min-width: 72px; background: var(--yellow); color: var(--ink); font-weight: 700; border-right: 2px solid var(--white); }
-.score-table thead .sticky-2 { background: var(--yellow); color: var(--ink); }
+.score-table .sticky-2 { position: sticky; left: 72px; z-index: 2; min-width: 72px; background: var(--yellow); color: var(--on-bright); font-weight: 700; border-right: 2px solid var(--white); }
+.score-table thead .sticky-2 { background: var(--yellow); color: var(--on-bright); }
 .score-table tbody tr td.sticky-1 { background: var(--navy); }
 .score-table tbody tr td.sticky-2 { background: var(--yellow); }
 .score-table .day-start { border-left: 1.5px solid var(--line); }
@@ -451,7 +456,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .gate .login { width: 100%; margin-top: 8vh; }
 .gate-title { margin: 12px 0 4px; font-size: 1.35rem; letter-spacing: 0.08em; }
 .gate-note { font-size: 0.85rem; color: var(--white); border-left: 4px solid var(--yellow); background: var(--shade); padding: 8px 10px; text-align: left; }
-.gate-error { min-height: 1.5em; margin: 10px 0 0; color: #ffb39a; font-weight: 700; }
+.gate-error { min-height: 1.5em; margin: 10px 0 0; color: var(--soft-red); font-weight: 700; }
 
 .entry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .entry {
@@ -495,10 +500,10 @@ input[type="number"] { -moz-appearance: textfield; }
 .practice-bar {
     display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
     padding: 10px 14px; margin-bottom: 16px;
-    background: var(--yellow); color: var(--ink);
+    background: var(--yellow); color: var(--on-bright);
 }
 .practice-bar span { flex: 1; min-width: 200px; }
-.practice-bar .btn-outline { border-color: var(--ink); color: var(--ink); }
+.practice-bar .btn-outline { border-color: var(--on-bright); color: var(--on-bright); }
 
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
 .check input { width: auto; padding: 0; }
@@ -523,7 +528,7 @@ code { font-family: ui-monospace, Consolas, monospace; background: rgba(255, 255
 .st-tile.busy { border-color: var(--yellow); }
 .st-tile.busy .st-info small { color: var(--yellow); font-weight: 700; }
 .st-tile.picked { background: var(--white); color: var(--ink); border-color: var(--white); }
-.st-tile.picked .st-info small, .st-tile.picked .st-count { color: var(--navy); }
+.st-tile.picked .st-info small, .st-tile.picked .st-count { color: var(--on-bright-soft); }
 
 /* 紀錄表格 */
 .rec-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; white-space: nowrap; }
@@ -532,11 +537,11 @@ code { font-family: ui-monospace, Consolas, monospace; background: rgba(255, 255
 .rec-table td.wrap { white-space: normal; min-width: 140px; }
 .rec-table td.actions { text-align: right; }
 .rec-table td.num, .rec-table .num { font-size: 1.1em; color: var(--orange); }
-.rec-table tr.deleted td { color: #7f93b8; text-decoration: line-through; }
+.rec-table tr.deleted td { color: var(--faint); text-decoration: line-through; }
 .rec-table tr.deleted td.actions { text-decoration: none; }
 .rec-table .empty { text-align: center; padding: 18px; }
 
-.score-table td.pending { color: #7f93b8; font-weight: 500; }
+.score-table td.pending { color: var(--faint); font-weight: 500; }
 
 /* 設定 */
 .modal-wide { max-width: 980px; }
@@ -567,12 +572,12 @@ code { font-family: ui-monospace, Consolas, monospace; background: rgba(255, 255
 .choice-grid button {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     min-height: 64px; padding: 10px 6px;
-    border: 1.5px solid var(--line); background: rgba(4, 14, 38, 0.85);
+    border: 1.5px solid var(--line); background: var(--field);
     font-weight: 900; font-size: 1.05rem;
 }
 .choice-grid button small { font-weight: 500; font-size: 0.8rem; color: var(--muted); }
-.choice-grid button.picked { background: var(--yellow); border-color: var(--yellow); color: var(--ink); }
-.choice-grid button.picked small { color: var(--navy); }
+.choice-grid button.picked { background: var(--yellow); border-color: var(--yellow); color: var(--on-bright); }
+.choice-grid button.picked small { color: var(--on-bright-soft); }
 
 .rank-row, .like-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .rank-row select { width: 9em; }
@@ -582,7 +587,7 @@ code { font-family: ui-monospace, Consolas, monospace; background: rgba(255, 255
 
 #submitBtn { margin-top: 14px; }
 .btn-cancel { width: 100%; margin-top: 8px; padding: 10px; }
-.record-list li.deleted .main, .record-list li.deleted .meta { color: #7f93b8; text-decoration: line-through; }
+.record-list li.deleted .main, .record-list li.deleted .meta { color: var(--faint); text-decoration: line-through; }
 
 .entry { flex-direction: column; align-items: center; }
 .entry small { font-size: 0.72rem; font-weight: 400; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -590,3 +595,62 @@ code { font-family: ui-monospace, Consolas, monospace; background: rgba(255, 255
 /* 分頁列只允許左右捲動，避免右邊出現上下箭頭 */
 .tabs { overflow-y: hidden; }
 .tab { margin-bottom: 0; }
+
+/* ---------- 場內加分頁 ---------- */
+
+.team-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 16px; }
+.team-grid button {
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+    padding: 8px 2px 6px; border: 1.5px solid var(--line); background: var(--shade);
+}
+.team-grid button .num { font-size: 1.7rem; line-height: 1; }
+.team-grid button small { font-family: var(--font-display); font-size: 0.8rem; color: var(--muted); }
+.team-grid button.picked { background: var(--yellow); border-color: var(--yellow); color: var(--on-bright); }
+.team-grid button.picked small { color: var(--on-bright-soft); }
+
+.quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.quick-grid button {
+    padding: 14px 4px; border: 1.5px solid var(--line); background: var(--shade);
+    font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; line-height: 1;
+}
+.quick-grid button.minus { color: var(--soft-red); }
+.quick-grid button:disabled { opacity: 0.35; cursor: not-allowed; }
+.custom-row { display: flex; gap: 8px; }
+.custom-row .btn { flex: none; padding: 0 22px; }
+
+.check-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.student { max-width: 900px; margin: 0 auto; }
+.map-img { width: 100%; height: auto; display: block; border: 2px solid var(--white); }
+
+/* ---------- 淺色主題：戶外大太陽下用（關主頁、加分頁、學員頁）---------- */
+/* 只換顏色變數；深色主題是預設值 */
+
+body.light {
+    --ink: #f3efe4;
+    --navy: #ffffff;
+    --white: #061637;
+    --muted: #4d6088;
+    --sky: #1a5fb4;
+    --orange: #cf6a08;
+    --rule: rgba(6, 22, 55, 0.85);
+    --line: rgba(6, 22, 55, 0.32);
+    --line-soft: rgba(6, 22, 55, 0.13);
+    --shade: rgba(255, 255, 255, 0.9);
+    --field: #ffffff;
+    --faint: #8794b0;
+    --soft-red: #c2360c;
+    --ok: #1a9a5e;
+}
+body.light::after, body.light.display::after { background: rgba(243, 239, 228, 0.93); }
+body.light .logo { filter: brightness(0); opacity: 0.88; }
+body.light .modal { background: rgba(6, 22, 55, 0.55); }
+
+/* 不管哪個主題，這些都是亮底配深字、紅底配白字 */
+.toast { background: #ffffff; color: var(--on-bright); }
+.toast-warn { background: var(--yellow); }
+.toast-error, .conn-off { color: #ffffff; }
+.btn-primary { color: #ffffff; }
+.btn-danger:hover:not(:disabled) { color: #ffffff; }
+
+.lockup-big { white-space: nowrap; }
+.phone .lockup-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

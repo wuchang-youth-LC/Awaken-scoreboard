@@ -3,40 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NPC 加分｜2026 Awaken</title>
+    <title>場內加分｜Awaken</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="light">
     <div class="phone" id="main" hidden>
         <header class="page-head">
             <img class="logo" src="assets/logo-awaken.png" alt="AWAKEN">
             <div class="lockup">
-                <span class="lockup-big">NPC</span>
+                <span class="lockup-big">加分</span>
                 <div class="lockup-text"><h1 id="whoami"></h1><span class="lockup-sub" data-camp-title></span></div>
             </div>
             <div class="head-right"><button class="btn btn-ghost" id="logoutBtn">登出</button></div>
         </header>
 
-        <div class="panel">
-            <div class="row">
-                <div class="field"><label class="label" for="daySelect">日期</label><select id="daySelect"></select></div>
-                <div class="field"><label class="label" for="eventSelect">項目</label><select id="eventSelect"></select></div>
-            </div>
-            <div class="row">
-                <div class="field"><label class="label" for="teamSelect">隊伍</label><select id="teamSelect"></select></div>
-                <div class="field"><label class="label" for="scoreInput">分數（扣分加負號）</label><input type="number" id="scoreInput" inputmode="numeric" placeholder="例如 50 或 -20"></div>
-            </div>
-            <button class="btn btn-primary btn-block" id="submitBtn">送出加分</button>
+        <div class="practice-bar" id="practiceBar" hidden><span><b>練習模式</b>　可以隨便按，不會影響正式成績。</span></div>
+
+        <!-- 1. 項目：會自動選今天，並記住上次用的項目 -->
+        <div class="row">
+            <div class="field"><label class="label" for="daySelect">日期</label><select id="daySelect"></select></div>
+            <div class="field"><label class="label" for="eventSelect">項目</label><select id="eventSelect"></select></div>
         </div>
 
-        <h2 class="section-title">即時總分</h2>
-        <div class="mini-board" id="board"></div>
+        <!-- 2. 隊伍：按一下就選好，下面的小字是目前總分 -->
+        <label class="label">隊伍</label>
+        <div class="team-grid" id="teamGrid"></div>
 
-        <h2 class="section-title">我送出的紀錄</h2>
-        <div class="panel"><ul class="record-list" id="history"></ul></div>
+        <!-- 3. 分數：按常用分數就直接送出 -->
+        <label class="label" id="pointsLabel">分數（先選隊伍）</label>
+        <div class="quick-grid" id="quickGrid"></div>
+        <div class="custom-row">
+            <input type="number" id="scoreInput" inputmode="numeric" placeholder="自訂分數，扣分加負號">
+            <button class="btn btn-primary" id="submitBtn">送出</button>
+        </div>
+
+        <h2 class="section-title">我剛剛送出的</h2>
+        <ul class="record-list" id="history"></ul>
     </div>
 
     <script type="module" src="npc.js"></script>

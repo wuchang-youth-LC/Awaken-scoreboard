@@ -186,3 +186,12 @@ test("賽程表：兩隊與四隊都能解析", () => {
     assert.deepEqual(parseScheduleTeams("第1輪\t1\n\t2\n\t3\n\t4"), { 1: { 1: ["第1隊", "第2隊", "第3隊", "第4隊"] } });
     assert.deepEqual(parseScheduleTeams("亂貼的文字"), {});
 });
+
+import { studentConfig } from "../games.js";
+
+test("學員頁設定：預設只開地圖", () => {
+    assert.deepEqual(studentConfig({}), { game: "d2", map: true, stations: false, scores: false });
+    assert.deepEqual(studentConfig({ student: { game: "d3", map: false, stations: true, scores: true } }),
+        { game: "d3", map: false, stations: true, scores: true });
+    assert.equal(studentConfig({ student: { game: "亂打" } }).game, "d2");
+});

@@ -143,3 +143,8 @@ export async function clearGame(game) {
     await updateDoc(stateRef(), { [`active.${game}`]: deleteField(), [`rounds.${game}`]: deleteField() });
     return docs.length;
 }
+
+// 清空全部加分紀錄（營會前清掉測試資料用）
+export function clearBonus() {
+    return deleteAll(col(BONUS));
+}

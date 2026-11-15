@@ -282,3 +282,16 @@ export function parseScheduleTeams(text) {
     flush();
     return schedule;
 }
+
+// ---------- 學員頁 ----------
+
+// 學員頁現在顯示哪一場、開放哪些區塊（總控台設定）。預設只開地圖
+export function studentConfig(settings) {
+    const raw = settings?.student || {};
+    return {
+        game: GAME_IDS.includes(raw.game) ? raw.game : GAME_IDS[0],
+        map: raw.map !== false,
+        stations: raw.stations === true,
+        scores: raw.scores === true
+    };
+}
