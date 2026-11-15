@@ -1,0 +1,6 @@
+{
+  "name": "rules-live-test",
+  "private": true,
+  "type": "module",
+  "dependencies": { "firebase": "10.8.1" }
+}

@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-    collection, doc, onSnapshot, getDoc, addDoc, updateDoc, setDoc, deleteDoc, writeBatch
+    collection, doc, onSnapshot, getDoc, getDocs, addDoc, updateDoc, setDoc, deleteDoc, deleteField, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { firebaseConfig } from "./config.js";
 import { withDefaults } from "./scoring.js";
@@ -15,7 +15,7 @@ export const db = initializeFirestore(app, {
 });
 
 export const settingsRef = doc(db, "settings_global", "global");
-export { collection, doc, onSnapshot, getDoc, addDoc, updateDoc, setDoc, deleteDoc, writeBatch };
+export { collection, doc, onSnapshot, getDoc, getDocs, addDoc, updateDoc, setDoc, deleteDoc, deleteField, writeBatch };
 
 // 監聽全域設定；callback 收到的設定已補好預設值
 // 第二個參數 online：false 代表目前讀的是手機快取（離線中）

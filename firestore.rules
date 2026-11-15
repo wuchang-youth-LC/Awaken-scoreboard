@@ -131,5 +131,86 @@ service cloud.firestore {
         && inRoster(request.resource.data);
       allow delete: if isAdmin() || (request.auth != null && request.auth.uid == uid);
     }
+
+    // =====================================================
+    // 2027 新版資料：大地遊戲紀錄、即時狀態、修改紀錄、練習模式
+    // 練習模式的資料放在 practice_ 開頭的集合，規則相同
+    // =====================================================
+
+    function me() {
+      return get(sessionPath()).data;
+    }
+
+    function isStaff() {
+      return request.auth != null && exists(sessionPath()) && inRoster(me());
+    }
+
+    function isStationStaff() {
+      return isStaff() && me().role in [d2, d3];
+    }
+
+    function validGameRecord(d) {
+      return d.game == me().role
+        && d.station == me().station
+        && d.teams is list && d.teams.size() >= 1 && d.teams.size() <= 4
+        && d.result is map;
+    }
+
+    // 關主只能動到 state 文件裡自己那一關的欄位
+    function onlyMyStation(field) {
+      let after = request.resource.data.get(field, {});
+      let before = resource.data.get(field, {});
+      let role = me().role;
+      return after.diff(before).affectedKeys().hasOnly([role])
+        && after.get(role, {}).diff(before.get(role, {})).affectedKeys().hasOnly([string(me().station)]);
+    }
+
+    match /{col}/{id} {
+      // ---------- 大地遊戲紀錄 ----------
+      allow read: if col in [records_game, practice_records_game, practice_records_bonus];
+      allow create: if col in [records_game, practice_records_game]
+        && (isAdmin() || (isStationStaff()
+            && validGameRecord(request.resource.data)
+            && request.resource.data.by == me().name));
+      // 修改、刪除（標記為已刪除，可復原）：只能動自己那一關的
+      allow update: if col in [records_game, practice_records_game]
+        && (isAdmin() || (isStationStaff()
+            && resource.data.game == me().role
+            && resource.data.station == me().station
+            && validGameRecord(request.resource.data)));
+
+      // ---------- 加分（計分組、牧者共用）----------
+      allow create: if col == practice_records_bonus
+        && (isAdmin() || (isStaff() && me().role == npc
+            && request.resource.data.npc == me().name
+            && request.resource.data.team is string
+            && request.resource.data.reason is string
+            && request.resource.data.val is int));
+      allow update: if col in [records_bonus, practice_records_bonus]
+        && (isAdmin() || (isStaff() && me().role == npc
+            && resource.data.npc == me().name
+            && request.resource.data.npc == me().name
+            && request.resource.data.val is int));
+
+      // ---------- 修改紀錄：只能新增，只有管理員能看 ----------
+      allow read: if col in [audit, practice_audit] && isAdmin();
+      allow create: if col in [audit, practice_audit]
+        && (isAdmin() || (isStaff() && request.resource.data.by == me().name));
+
+      // 真的刪掉資料（清空）只有管理員可以
+      allow delete: if col in [records_game, practice_records_game, practice_records_bonus, audit, practice_audit]
+        && isAdmin();
+    }
+
+    // ---------- 即時狀態：哪一關有隊伍在玩、各關目前輪次 ----------
+    match /state/{mode} {
+      allow read: if true;
+      allow create, delete: if isAdmin() && mode in [live, practice];
+      allow update: if isAdmin()
+        || (isStationStaff()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([active, rounds])
+            && onlyMyStation(active)
+            && onlyMyStation(rounds));
+    }
   }
 }
