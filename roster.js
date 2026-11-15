@@ -2,9 +2,9 @@
 // 名單存在 staff/{key}：D2 第 3 關是 "d2_3"、D3 第 2 關是 "d3_2"、NPC 是 "npc"
 
 export const ROLES = {
-    d2: { label: "D2 關主", page: "admin.html" },
-    d3: { label: "D3 關主", page: "admin_2.html" },
-    npc: { label: "NPC", page: "npc.html" }
+    d2: { label: "D2 關主", page: "station.html?game=d2" },
+    d3: { label: "D3 關主", page: "station.html?game=d3" },
+    npc: { label: "加分人員", page: "npc.html" }
 };
 
 export function rosterKey(role, station) {

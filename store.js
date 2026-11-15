@@ -108,8 +108,9 @@ export async function ensureStateDocs() {
     }
 }
 
-export function watchAudit(callback) {
-    return watchCollection(col(AUDIT), callback);
+export async function fetchAudit() {
+    const snap = await getDocs(collection(db, col(AUDIT)));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 async function deleteAll(name) {

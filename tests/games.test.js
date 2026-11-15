@@ -169,3 +169,20 @@ test("修改紀錄的格式", () => {
     const e = auditEntry("delete", "records_game", "abc", { station: 1 }, null, "小明", 123);
     assert.deepEqual(e, { action: "delete", collection: "records_game", recordId: "abc", before: { station: 1 }, after: null, by: "小明", at: 123 });
 });
+
+import { parseLevels, formatLevels, parseNumberList, parseScheduleTeams } from "../games.js";
+
+test("設定文字：等級與分數", () => {
+    assert.deepEqual(parseLevels("過關=100， 完美過關 : 150\n亂打, =5"), [{ label: "過關", pts: 100 }, { label: "完美過關", pts: 150 }]);
+    assert.equal(formatLevels([{ label: "過關", pts: 100 }, { label: "完美", pts: 150 }]), "過關=100, 完美=150");
+    assert.deepEqual(parseNumberList("100, 50，30 abc"), [100, 50, 30]);
+});
+
+test("賽程表：兩隊與四隊都能解析", () => {
+    assert.deepEqual(parseScheduleTeams("第1輪\t1\t3\n\t2\t4\n第2輪\t1\t2\n\t3\t4\n"), {
+        1: { 1: ["第1隊", "第2隊"], 2: ["第3隊", "第4隊"] },
+        2: { 1: ["第1隊", "第3隊"], 2: ["第2隊", "第4隊"] }
+    });
+    assert.deepEqual(parseScheduleTeams("第1輪\t1\n\t2\n\t3\n\t4"), { 1: { 1: ["第1隊", "第2隊", "第3隊", "第4隊"] } });
+    assert.deepEqual(parseScheduleTeams("亂貼的文字"), {});
+});

@@ -30,5 +30,5 @@ test("登入身分是否符合這個頁面", () => {
 
 test("登入身分顯示文字", () => {
     assert.equal(sessionLabel({ role: "d3", station: 2, name: "小明" }), "D3 關主・第 2 關・小明");
-    assert.equal(sessionLabel({ role: "npc", station: 0, name: "阿華" }), "NPC・阿華");
+    assert.equal(sessionLabel({ role: "npc", station: 0, name: "阿華" }), "加分人員・阿華");
 });

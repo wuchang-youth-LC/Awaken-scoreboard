@@ -489,3 +489,100 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .gate { isolation: isolate; }
 .gate::before { content: ""; position: fixed; inset: 0; background: url("bg.jpg") center / cover no-repeat; opacity: 0.22; z-index: -1; }
+
+/* ---------- 總控台（2027 新版）---------- */
+
+.practice-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    padding: 10px 14px; margin-bottom: 16px;
+    background: var(--yellow); color: var(--ink);
+}
+.practice-bar span { flex: 1; min-width: 200px; }
+.practice-bar .btn-outline { border-color: var(--ink); color: var(--ink); }
+
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+.check input { width: auto; padding: 0; }
+code { font-family: ui-monospace, Consolas, monospace; background: rgba(255, 255, 255, 0.12); padding: 0 4px; }
+.warn { color: var(--yellow); font-weight: 700; }
+
+.tabs { overflow-x: auto; flex-wrap: nowrap; }
+.tab { white-space: nowrap; flex: none; }
+
+/* 各關狀態總覽：一眼看完哪一關有人、各有幾筆紀錄 */
+.st-tiles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); margin-bottom: 18px; }
+.st-tile {
+    display: flex; align-items: center; gap: 10px; min-width: 0;
+    padding: 8px 10px; text-align: left;
+    background: var(--shade); border: 1.5px solid var(--line); color: var(--white);
+}
+.st-tile .st-no { font-size: 1.9rem; line-height: 1; }
+.st-tile .st-info { display: flex; flex-direction: column; flex: 1; min-width: 0; line-height: 1.3; }
+.st-tile .st-info b, .st-tile .st-info small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-tile .st-info small { color: var(--muted); font-size: 0.78rem; }
+.st-tile .st-count { font-size: 1.3rem; color: var(--muted); }
+.st-tile.busy { border-color: var(--yellow); }
+.st-tile.busy .st-info small { color: var(--yellow); font-weight: 700; }
+.st-tile.picked { background: var(--white); color: var(--ink); border-color: var(--white); }
+.st-tile.picked .st-info small, .st-tile.picked .st-count { color: var(--navy); }
+
+/* 紀錄表格 */
+.rec-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; white-space: nowrap; }
+.rec-table th, .rec-table td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+.rec-table th { color: var(--muted); font-size: 0.8rem; letter-spacing: var(--track); background: var(--navy); }
+.rec-table td.wrap { white-space: normal; min-width: 140px; }
+.rec-table td.actions { text-align: right; }
+.rec-table td.num, .rec-table .num { font-size: 1.1em; color: var(--orange); }
+.rec-table tr.deleted td { color: #7f93b8; text-decoration: line-through; }
+.rec-table tr.deleted td.actions { text-decoration: none; }
+.rec-table .empty { text-align: center; padding: 18px; }
+
+.score-table td.pending { color: #7f93b8; font-weight: 500; }
+
+/* 設定 */
+.modal-wide { max-width: 980px; }
+.cfg-row { display: grid; grid-template-columns: 2em 1.2fr 1fr 8.5em 4em 2fr 5em; gap: 6px; align-items: center; margin-bottom: 6px; }
+.cfg-row input, .cfg-row select { padding: 8px; font-size: 0.9rem; }
+.cfg-row input:disabled { opacity: 0.3; }
+.cfg-head { font-size: 0.78rem; color: var(--muted); letter-spacing: var(--track); }
+.setup-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
+.roster-row label small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+.roster-row { grid-template-columns: 6em 1fr; }
+
+@media (max-width: 700px) {
+    .cfg-head { display: none; }
+    .cfg-row { grid-template-columns: 2em 1fr 1fr; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft); }
+    .cfg-row [data-f="points"] { grid-column: 2 / 4; }
+    .toolbar .spacer { display: none; }
+    .toolbar .state { width: 100%; }
+    .dash .page-head .head-right .hint { display: none; }
+}
+
+/* ---------- 關主頁（2027 新版）---------- */
+
+.status-line { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 1.1rem; letter-spacing: var(--track); padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1.5px solid var(--rule); }
+.status-line.busy b { font-size: 1.15rem; letter-spacing: 0; }
+
+.choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+.choice-grid.three { grid-template-columns: repeat(3, 1fr); }
+.choice-grid button {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-height: 64px; padding: 10px 6px;
+    border: 1.5px solid var(--line); background: rgba(4, 14, 38, 0.85);
+    font-weight: 900; font-size: 1.05rem;
+}
+.choice-grid button small { font-weight: 500; font-size: 0.8rem; color: var(--muted); }
+.choice-grid button.picked { background: var(--yellow); border-color: var(--yellow); color: var(--ink); }
+.choice-grid button.picked small { color: var(--navy); }
+
+.rank-row, .like-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.rank-row select { width: 9em; }
+.like-row { padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.like-row > span { font-weight: 700; font-size: 0.9rem; }
+.like-row .stepper button { width: 40px; height: 40px; }
+
+#submitBtn { margin-top: 14px; }
+.btn-cancel { width: 100%; margin-top: 8px; padding: 10px; }
+.record-list li.deleted .main, .record-list li.deleted .meta { color: #7f93b8; text-decoration: line-through; }
+
+.entry { flex-direction: column; align-items: center; }
+.entry small { font-size: 0.72rem; font-weight: 400; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

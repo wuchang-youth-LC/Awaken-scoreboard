@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>關主｜Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="phone">
+        <header class="page-head">
+            <img class="logo" src="assets/logo-awaken.png" alt="AWAKEN">
+            <div class="lockup">
+                <span class="lockup-big" id="gameBig"></span>
+                <div class="lockup-text"><h1 id="stationTitle">載入中…</h1><span class="lockup-sub" id="stationSub"></span></div>
+            </div>
+            <div class="head-right"><button class="btn btn-ghost" id="logoutBtn">登出</button></div>
+        </header>
+
+        <div class="practice-bar" id="practiceBar" hidden><span><b>練習模式</b>　可以隨便按，不會影響正式成績。</span></div>
+
+        <div class="round-ctrl" id="roundCtrl" hidden>
+            <button class="btn btn-outline" id="prevRound">‹ 上一輪</button>
+            <span class="round">第<span class="num" id="roundNum">1</span>輪</span>
+            <button class="btn btn-outline" id="nextRound">下一輪 ›</button>
+        </div>
+
+        <!-- 空關：選隊伍、按開始 -->
+        <div class="panel" id="idleView" hidden>
+            <div class="status-line"><span class="dot dot-free"></span>目前空關</div>
+            <label class="label" id="pickLabel">哪一隊來了？</label>
+            <div id="teamPickers"></div>
+            <button class="btn btn-primary btn-block" id="startBtn">開始闖關</button>
+        </div>
+
+        <!-- 闖關中：選結果、給讚、送出 -->
+        <div class="panel" id="activeView" hidden>
+            <div class="status-line busy"><span class="tag">闖關中</span><b id="activeTeams"></b></div>
+            <label class="label">結果</label>
+            <div id="resultInput"></div>
+            <div id="likesInput"></div>
+            <button class="btn btn-primary btn-block" id="submitBtn">送出成績</button>
+            <button class="btn btn-ghost btn-cancel" id="cancelBtn">取消，改回空關</button>
+        </div>
+
+        <h2 class="section-title">本關紀錄</h2>
+        <ul class="record-list" id="records"></ul>
+    </div>
+
+    <!-- 修改紀錄 -->
+    <div class="modal" id="modal_record">
+        <div class="modal-box">
+            <h2>修改紀錄</h2>
+            <div class="field" id="record_roundField"><label class="label">輪次</label><input type="number" id="record_round" min="1"></div>
+            <div id="record_fields"></div>
+            <p class="gate-error" id="record_error"></p>
+            <div class="modal-actions">
+                <button class="btn btn-outline" data-close>取消</button>
+                <button class="btn btn-primary" id="record_save">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="station.js"></script>
+</body>
+</html>

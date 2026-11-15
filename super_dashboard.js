@@ -1,413 +1,99 @@
-// 總控台：D2 / D3 即時監控、參數設定、總積分大表
+// 總控台：總積分、D2 / D3 大地遊戲、加分紀錄、工作人員名單、設定
+import { watchCollection, commit, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, settingsRef, db } from "./firebase.js";
 import {
-    watchSettings, watchCollection, patchSettings, deleteRecords, commit,
-    collection, doc, addDoc, updateDoc, setDoc, getDoc, deleteDoc, writeBatch, settingsRef, db
-} from "./firebase.js";
+    watchCamp, GAME, BONUS, createRecord, updateRecord, deleteRecord, restoreRecord,
+    ensureStateDocs, fetchAudit, clearPracticeData, clearGame, clearStation
+} from "./store.js";
 import {
-    rankD2Station, d2StationConfig, formatD2Value, d3Match, parseSchedule,
-    campColumns, computeTotals, teamList, d3Loser, UNCATEGORIZED
-} from "./scoring.js";
-import { CAMP, D2_COLUMN, D3_COLUMN } from "./config.js";
+    GAME_IDS, GAME_LABELS, GAME_TYPES, AUDIT_LABELS, gameConfig, normalizeStation, stationLabel, scheduledTeams,
+    validateRecord, recordPoints, resultText, computeCampTotals,
+    parseLevels, formatLevels, parseNumberList, parseScheduleTeams
+} from "./games.js";
+import { campColumns, resolveBonusKey, teamList, UNCATEGORIZED } from "./scoring.js";
+import { CAMP } from "./config.js";
 import { $, esc, teamOptions, toast, toastCommit, connectionBadge, openModal, closeModal } from "./ui.js";
 import { requireAdmin, logoutAdmin } from "./auth.js";
 import { parseNames, rosterKey, sessionLabel } from "./roster.js";
+import { recordFormHtml, readRecordForm } from "./record-form.js";
 
-let settings = null, recordsD2 = [], recordsD3 = [], recordsBonus = [];
+const ADMIN_NAME = "總控台";   // 寫在公開資料上的記錄者名稱（不放 email）
+let settings = null, games = [], bonus = [], state = { active: {}, rounds: {} };
 let lastTotals = null;
+const view = { d2: { station: null, showDeleted: false }, d3: { station: null, showDeleted: false } };
 const setOnline = connectionBadge();
 
-// 先登入管理員帳號
+const fmtTime = ts => ts ? new Date(ts).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+const fullTime = ts => ts ? new Date(ts).toLocaleString("zh-TW") : "";
+const int = (el, fallback) => {
+    const n = parseInt((typeof el === "string" ? $(el) : el).value, 10);
+    return Number.isNaN(n) ? fallback : n;
+};
+const signed = n => (n > 0 ? `+${n}` : `${n}`);
+
+async function run(promise, okText) {
+    try {
+        const result = await promise;
+        if (okText) toastCommit(result, okText);
+        return true;
+    } catch (err) {
+        console.error(err);
+        toast(err.code === "permission-denied" ? "沒有權限，請確認這個帳號是管理員" : "操作失敗，請檢查網路後再試", "error");
+        return false;
+    }
+}
+
+// ---------- 登入與初始化 ----------
+
 const admin = await requireAdmin();
 $("adminWho").textContent = admin.email;
 $("adminLogout").addEventListener("click", () => logoutAdmin());
+const auditBy = admin.email;   // 修改紀錄只有管理員看得到，可以放 email 分辨是誰
 
-// 新專案第一次使用：先建立設定文件（關主切換燈號時需要它已經存在）
+// 新專案第一次使用：建立設定文件與狀態文件（關主更新自己那一關時，文件必須已經存在）
 try {
     const first = await getDoc(settingsRef);
     if (!first.exists()) await setDoc(settingsRef, { createdAt: Date.now() }, { merge: true });
+    await ensureStateDocs();
 } catch (err) {
     console.error(err);
     toast("這個帳號沒有管理員權限，請確認安全規則裡有這個帳號的 UID", "error");
 }
-
-const fmtTime = ts => ts ? new Date(ts).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
-const int = (id, fallback) => {
-    const n = parseInt($(id).value, 10);
-    return Number.isNaN(n) ? fallback : n;
-};
-const stationOptions = (n, selected) => Array.from({ length: n }, (_, i) => i + 1)
-    .map(i => `<option value="${i}"${i === selected ? " selected" : ""}>第 ${i} 關</option>`).join("");
-
-// ---------- 分頁 ----------
 
 document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
     document.querySelectorAll(".tab-panel").forEach(p => { p.hidden = p.id !== tab.dataset.tab; });
 }));
 
-// ---------- 即時監聽 ----------
+watchCamp({
+    settings(s, online, practice) {
+        settings = s;
+        setOnline(online);
+        $("practiceBar").hidden = !practice;
+        $("practiceOnBtn").hidden = practice;
+        renderAll();
+        renderRoster();
+        renderSetup();
+    },
+    games(list) { games = list; renderAll(); },
+    bonus(list) { bonus = list; renderAll(); },
+    state(st) { state = st; GAME_IDS.forEach(renderGame); }
+});
 
-watchSettings((s, online) => {
-    settings = s;
-    setOnline(online);
-    renderToolbars();
-    renderD2Monitor();
-    renderD3Monitor();
+function renderAll() {
+    if (!settings) return;
     renderTotals();
-    renderRoster();
-});
-watchCollection("records_d2", list => { recordsD2 = list; renderD2Monitor(); renderTotals(); });
-watchCollection("records_d3", list => { recordsD3 = list; renderD3Monitor(); renderTotals(); });
-watchCollection("records_bonus", list => { recordsBonus = list; renderTotals(); });
-
-function renderToolbars() {
-    for (const day of ["d2", "d3"]) {
-        const locked = settings[`${day}_locked`], hidden = settings[`${day}_hidden`];
-        $(`${day}_state`).innerHTML = `關主輸入：<b>${locked ? "已鎖定" : "開放中"}</b>　展示畫面：<b>${hidden ? "已隱藏" : "顯示中"}</b>`;
-        $(`${day}_lockBtn`).textContent = locked ? "開放輸入" : "鎖定輸入";
-        $(`${day}_hideBtn`).textContent = hidden ? "恢復展示" : "隱藏展示（結算用）";
-    }
+    GAME_IDS.forEach(renderGame);
+    renderBonus();
 }
 
-const statusChip = busy => `<span class="chip ${busy ? "chip-busy" : ""}"><span class="dot ${busy ? "dot-busy" : "dot-free"}"></span>${busy ? "闖關中" : "空關"}</span>`;
-const actionBtns = (kind, id) => `<span class="actions"><button class="btn btn-ghost" data-edit-${kind}="${esc(id)}">改</button><button class="btn btn-ghost danger" data-del-${kind}="${esc(id)}">刪</button></span>`;
-
-// ---------- D2 監控 ----------
-
-function renderD2Monitor() {
-    if (!settings) return;
-    const cards = [];
-    for (let st = 1; st <= settings.numStations_d2; st++) {
-        const conf = d2StationConfig(settings, st);
-        const ranked = rankD2Station(recordsD2, settings, st);
-        const all = recordsD2.filter(r => r.station === st && !r.isLikeOnly).sort((a, b) => b.createdAt - a.createdAt);
-        const line = e => `<li><span><span class="pip pip-${e.rank}">${e.rank}</span> ${esc(e.team)}</span><span class="num">${esc(formatD2Value(e.val, conf))}</span>${actionBtns("d2", e.record.id)}</li>`;
-        const top = ranked.filter(e => e.rank <= 3), rest = ranked.filter(e => e.rank > 3);
-
-        cards.push(`
-            <article class="panel monitor-card">
-                <div class="head"><span class="st-name">第 ${st} 關</span><span class="hint" style="margin:0">${conf.type === "time" ? "計時" : "計分"}</span>${statusChip(settings.d2_status[st] === "red")}</div>
-                <ul class="record-list">${top.map(line).join("") || `<li class="empty">尚無成績</li>`}</ul>
-                ${rest.length ? `<details><summary>其他名次（${rest.length}）</summary><ul class="record-list">${rest.map(line).join("")}</ul></details>` : ""}
-                ${all.length ? `<details><summary>所有送出紀錄（${all.length}）</summary><ul class="record-list">${all.map(r => `
-                    <li><div><div class="main">${esc(r.team)}　<span class="num">${esc(formatD2Value(r.val, conf))}</span></div><div class="meta">讚 ${r.likes || 0}・${fmtTime(r.createdAt)}</div></div>${actionBtns("d2", r.id)}</li>`).join("")}</ul></details>` : ""}
-            </article>`);
-    }
-    $("d2_monitor").innerHTML = cards.join("");
-}
-
-// ---------- D3 監控 ----------
-
-function renderD3Monitor() {
-    if (!settings) return;
-    const cards = [];
-    for (let st = 1; st <= settings.numStations_d3; st++) {
-        const round = settings.d3_currRounds[st] || 1;
-        const m = d3Match(settings, round, st);
-        const recs = recordsD3.filter(r => r.station === st).sort((a, b) => b.createdAt - a.createdAt);
-        const busy = settings.d3_status[st] === "red";
-        cards.push(`
-            <article class="panel monitor-card">
-                <div class="head"><span class="st-name">第 ${st} 關</span>${statusChip(busy)}</div>
-                <div class="current">第 <b>${round}</b> 輪　${m ? `${esc(m.a)} vs ${esc(m.b)}` : "賽程表沒有這一場"}</div>
-                <ul class="record-list">${recs.map(r => `
-                    <li><div><div class="main">第 ${r.round} 輪　${esc(r.teamA)} vs ${esc(r.teamB)}</div><div class="meta">勝：${esc(r.winner)}・讚 ${r.likesA || 0} : ${r.likesB || 0}</div></div>${actionBtns("d3", r.id)}</li>`).join("") || `<li class="empty">尚無紀錄</li>`}</ul>
-            </article>`);
-    }
-    $("d3_monitor").innerHTML = cards.join("");
-}
-
-// 改 / 刪 按鈕（事件委派）
-document.addEventListener("click", async e => {
-    const t = e.target.closest("button");
-    if (!t) return;
-    const d = t.dataset;
-    if (d.delD2 && confirm("確定刪除這筆 D2 紀錄？")) await commit(deleteDocById("records_d2", d.delD2));
-    if (d.delD3 && confirm("確定刪除這筆 D3 紀錄？")) await commit(deleteDocById("records_d3", d.delD3));
-    if (d.editD2) openD2Record(recordsD2.find(r => r.id === d.editD2));
-    if (d.editD3) openD3Record(recordsD3.find(r => r.id === d.editD3));
-});
-
-function deleteDocById(col, id) {
-    return deleteRecords(col, [{ id }]);
-}
-
-// ---------- 鎖定、隱藏、清空 ----------
-
-for (const day of ["d2", "d3"]) {
-    $(`${day}_lockBtn`).addEventListener("click", () => patchSettings({ [`${day}_locked`]: !settings[`${day}_locked`] }));
-    $(`${day}_hideBtn`).addEventListener("click", () => patchSettings({ [`${day}_hidden`]: !settings[`${day}_hidden`] }));
-}
-
-async function clearAll(label, col, records, extraReset) {
-    if (prompt(`這會刪除全部 ${records.length} 筆${label}紀錄，無法復原。\n請輸入「確認」繼續`) !== "確認") return;
-    try {
-        await deleteRecords(col, records);
-        if (extraReset) await patchSettings(extraReset);
-        toast(`${label}已清空`);
-    } catch (err) {
-        console.error(err);
-        toast("清空途中失敗，請檢查網路後再按一次", "error");
-    }
-}
-$("d2_clearBtn").addEventListener("click", () => clearAll("D2 ", "records_d2", recordsD2, { d2_status: {} }));
-$("d3_clearBtn").addEventListener("click", () => clearAll("D3 ", "records_d3", recordsD3, { d3_status: {}, d3_currRounds: {} }));
-$("clearBonusBtn").addEventListener("click", () => clearAll("加分（含 NPC）", "records_bonus", recordsBonus));
-
-// ---------- D2 參數設定 ----------
-
-function renderD2StationConfigs(n) {
-    // 保留畫面上已經改過、還沒儲存的值
-    const current = {};
-    document.querySelectorAll("[data-st-type]").forEach(el => {
-        const st = el.dataset.stType;
-        current[st] = { type: el.value, unit: $(`st_unit_${st}`).value };
-    });
-    let html = "";
-    for (let st = 1; st <= n; st++) {
-        const conf = current[st] || d2StationConfig(settings, st);
-        html += `<div class="station-config-row">
-            <label>第 ${st} 關</label>
-            <select data-st-type="${st}"><option value="time"${conf.type === "time" ? " selected" : ""}>計時（越快越好）</option><option value="score"${conf.type === "score" ? " selected" : ""}>計分（越多越好）</option></select>
-            <input type="text" id="st_unit_${st}" placeholder="單位（例：顆）" value="${esc(conf.unit)}">
-        </div>`;
-    }
-    $("d2_station_configs").innerHTML = html;
-}
-
-$("d2_setBtn").addEventListener("click", () => {
-    const s = settings;
-    $("set_d2_stations").value = s.numStations_d2;
-    $("set_d2_maxMin").value = s.d2_maxMin;
-    $("set_d2_maxSec").value = s.d2_maxSec;
-    $("set_d2_maxScore").value = s.d2_maxScore;
-    $("set_d2_maxLikes").value = s.d2_maxLikes;
-    $("set_d2_likePts").value = s.d2_likePts;
-    $("set_d2_top1").value = s.d2_rules.top1;
-    $("set_d2_top2").value = s.d2_rules.top2;
-    $("set_d2_top3").value = s.d2_rules.top3;
-    $("set_d2_base").value = s.d2_rules.base;
-    $("d2_station_configs").innerHTML = "";
-    renderD2StationConfigs(s.numStations_d2);
-    openModal("modal_d2_settings");
-});
-$("set_d2_stations").addEventListener("input", () => {
-    const n = int("set_d2_stations", 0);
-    if (n > 0 && n <= 60) renderD2StationConfigs(n);
-});
-
-$("save_d2_settings").addEventListener("click", async () => {
-    const s = settings;
-    const stations = int("set_d2_stations", s.numStations_d2);
-    if (stations < 1) return toast("關卡數至少要 1", "warn");
-    const configs = { ...s.d2_configs };
-    for (let st = 1; st <= stations; st++) {
-        const typeEl = document.querySelector(`[data-st-type="${st}"]`);
-        if (typeEl) configs[st] = { type: typeEl.value, unit: $(`st_unit_${st}`).value.trim() };
-    }
-    await setDoc(settingsRef, {
-        numStations_d2: stations,
-        d2_maxMin: Math.max(0, int("set_d2_maxMin", s.d2_maxMin)),
-        d2_maxSec: Math.min(59, Math.max(0, int("set_d2_maxSec", s.d2_maxSec))),
-        d2_maxScore: int("set_d2_maxScore", s.d2_maxScore),
-        d2_maxLikes: Math.max(0, int("set_d2_maxLikes", s.d2_maxLikes)),
-        d2_likePts: int("set_d2_likePts", s.d2_likePts),
-        d2_rules: {
-            top1: int("set_d2_top1", s.d2_rules.top1), top2: int("set_d2_top2", s.d2_rules.top2),
-            top3: int("set_d2_top3", s.d2_rules.top3), base: int("set_d2_base", s.d2_rules.base)
-        },
-        d2_configs: configs
-    }, { merge: true });
-    closeModal("modal_d2_settings");
-    toast("D2 設定已儲存");
-});
-
-// ---------- D3 參數設定 ----------
-
-$("d3_setBtn").addEventListener("click", () => {
-    const s = settings;
-    $("set_d3_stations").value = s.numStations_d3;
-    $("set_d3_maxRounds").value = s.d3_maxRounds;
-    $("set_d3_maxLikes").value = s.d3_maxLikes;
-    $("set_d3_likePts").value = s.d3_likePts;
-    $("d3_rank_scores").innerHTML = teamList(s.numTeams).map((_, i) => `
-        <div class="field"><label class="label">第 ${i + 1} 名</label><input type="number" id="d3_rank_${i + 1}" value="${Number(s.d3_rankScores[i + 1]) || 0}"></div>`).join("");
-    openModal("modal_d3_settings");
-});
-
-$("save_d3_settings").addEventListener("click", async () => {
-    const s = settings;
-    const rankScores = {};
-    for (let i = 1; i <= s.numTeams; i++) rankScores[i] = int(`d3_rank_${i}`, 0);
-    await setDoc(settingsRef, {
-        numStations_d3: Math.max(1, int("set_d3_stations", s.numStations_d3)),
-        d3_maxRounds: Math.max(1, int("set_d3_maxRounds", s.d3_maxRounds)),
-        d3_maxLikes: Math.max(0, int("set_d3_maxLikes", s.d3_maxLikes)),
-        d3_likePts: int("set_d3_likePts", s.d3_likePts),
-        d3_rankScores: rankScores
-    }, { merge: true });
-    closeModal("modal_d3_settings");
-    toast("D3 設定已儲存");
-});
-
-// ---------- D3 賽程表 ----------
-
-$("d3_scheduleBtn").addEventListener("click", () => {
-    const rounds = Object.keys(settings.schedule).length;
-    $("scheduleCurrent").textContent = rounds ? `目前已匯入 ${rounds} 輪的賽程。重新匯入會整份覆蓋。` : "目前還沒有賽程表。";
-    $("scheduleInput").value = "";
-    openModal("modal_d3_schedule");
-});
-
-$("save_d3_schedule").addEventListener("click", async () => {
-    const schedule = parseSchedule($("scheduleInput").value);
-    const rounds = Object.keys(schedule);
-    // 格式錯誤時不要覆蓋掉原本的賽程表
-    if (!rounds.length) return toast("看不懂這份賽程表，請確認每輪開頭有「第1輪」並用 Tab 分隔", "error");
-    const matches = rounds.reduce((n, r) => n + Object.keys(schedule[r]).length, 0);
-    if (!confirm(`解析出 ${rounds.length} 輪、共 ${matches} 場對戰，確定覆蓋目前的賽程表？`)) return;
-    // 用 updateDoc 整份取代 schedule（setDoc merge 會把舊的輪次混在一起）
-    await updateDoc(settingsRef, { schedule });
-    closeModal("modal_d3_schedule");
-    toast("賽程表已匯入");
-});
-
-// ---------- 隊伍與計分項目 ----------
-
-$("score_setBtn").addEventListener("click", () => {
-    $("set_global_teams").value = settings.numTeams;
-    $("score_cols_fields").innerHTML = campColumns(settings).map((d, i) => `
-        <div class="field"><label class="label">${esc(d.day)}</label><input type="text" id="set_cols_d${i + 1}" value="${esc(d.cols.join(","))}"></div>`).join("");
-    openModal("modal_score_settings");
-});
-
-$("save_global_settings").addEventListener("click", async () => {
-    const teams = int("set_global_teams", settings.numTeams);
-    if (teams < 2) return toast("隊伍數至少要 2", "warn");
-    const fields = { numTeams: teams };
-    CAMP.days.forEach((_, i) => { fields[`cols_d${i + 1}`] = $(`set_cols_d${i + 1}`).value.trim(); });
-    await setDoc(settingsRef, fields, { merge: true });
-    closeModal("modal_score_settings");
-    toast("已儲存");
-});
-
-// ---------- D2 紀錄新增 / 編輯 ----------
-
-function syncD2RecordInputs() {
-    const conf = d2StationConfig(settings, parseInt($("d2_rec_station").value, 10));
-    $("d2_rec_timeGroup").hidden = conf.type !== "time";
-    $("d2_rec_scoreGroup").hidden = conf.type === "time";
-}
-
-function openD2Record(r) {
-    const rec = r || { station: 1, team: teamList(settings.numTeams)[0], val: "", likes: 0 };
-    $("d2_record_title").textContent = r ? "編輯 D2 紀錄" : "新增 D2 紀錄";
-    $("d2_edit_id").value = r ? r.id : "";
-    $("d2_rec_station").innerHTML = stationOptions(settings.numStations_d2, rec.station);
-    $("d2_rec_team").innerHTML = teamOptions(settings.numTeams, rec.team);
-    const val = Number.isFinite(rec.val) ? rec.val : "";
-    $("d2_rec_min").value = val === "" ? "" : Math.floor(val / 60);
-    $("d2_rec_sec").value = val === "" ? "" : val % 60;
-    $("d2_rec_val").value = val;
-    $("d2_rec_likes").value = rec.likes || 0;
-    syncD2RecordInputs();
-    openModal("modal_d2_record");
-}
-$("d2_addBtn").addEventListener("click", () => openD2Record(null));
-$("d2_rec_station").addEventListener("change", syncD2RecordInputs);
-
-$("save_d2_record").addEventListener("click", async () => {
-    const id = $("d2_edit_id").value;
-    const station = parseInt($("d2_rec_station").value, 10);
-    const conf = d2StationConfig(settings, station);
-    const val = conf.type === "time"
-        ? int("d2_rec_min", 0) * 60 + int("d2_rec_sec", 0)
-        : int("d2_rec_val", NaN);
-    if (Number.isNaN(val) || val < 0) return toast("請輸入數值", "warn");
-    const data = { station, team: $("d2_rec_team").value, val, likes: Math.max(0, int("d2_rec_likes", 0)) };
-    const result = await commit(id
-        ? updateDoc(doc(db, "records_d2", id), data)
-        : addDoc(collection(db, "records_d2"), { ...data, createdAt: Date.now() }));
-    closeModal("modal_d2_record");
-    toastCommit(result, "已儲存");
-});
-
-// ---------- D3 紀錄新增 / 編輯 ----------
-
-function syncD3Winner() {
-    const a = $("d3_rec_teamA").value, b = $("d3_rec_teamB").value, prev = $("d3_rec_winner").value;
-    $("d3_rec_winner").innerHTML = `<option value="${esc(a)}">${esc(a)}</option><option value="${esc(b)}">${esc(b)}</option>`;
-    if (prev === a || prev === b) $("d3_rec_winner").value = prev;
-}
-
-function openD3Record(r) {
-    const teams = teamList(settings.numTeams);
-    const rec = r || { station: 1, round: 1, teamA: teams[0], teamB: teams[1], winner: teams[0], likesA: 0, likesB: 0 };
-    $("d3_record_title").textContent = r ? "編輯 D3 紀錄" : "新增 D3 紀錄";
-    $("d3_edit_id").value = r ? r.id : "";
-    $("d3_rec_station").innerHTML = stationOptions(settings.numStations_d3, rec.station);
-    $("d3_rec_round").value = rec.round || 1;
-    $("d3_rec_teamA").innerHTML = teamOptions(settings.numTeams, rec.teamA);
-    $("d3_rec_teamB").innerHTML = teamOptions(settings.numTeams, rec.teamB);
-    $("d3_rec_likesA").value = rec.likesA || 0;
-    $("d3_rec_likesB").value = rec.likesB || 0;
-    $("d3_rec_winner").innerHTML = "";
-    syncD3Winner();
-    $("d3_rec_winner").value = rec.winner;
-    openModal("modal_d3_record");
-}
-$("d3_addBtn").addEventListener("click", () => openD3Record(null));
-$("d3_rec_teamA").addEventListener("change", syncD3Winner);
-$("d3_rec_teamB").addEventListener("change", syncD3Winner);
-
-$("save_d3_record").addEventListener("click", async () => {
-    const id = $("d3_edit_id").value;
-    const teamA = $("d3_rec_teamA").value, teamB = $("d3_rec_teamB").value, winner = $("d3_rec_winner").value;
-    if (teamA === teamB) return toast("兩隊不能是同一隊", "warn");
-    const data = {
-        station: parseInt($("d3_rec_station").value, 10),
-        round: Math.max(1, int("d3_rec_round", 1)),
-        teamA, teamB, winner, loser: winner === teamA ? teamB : teamA,
-        likesA: Math.max(0, int("d3_rec_likesA", 0)),
-        likesB: Math.max(0, int("d3_rec_likesB", 0))
-    };
-    const result = await commit(id
-        ? updateDoc(doc(db, "records_d3", id), data)
-        : addDoc(collection(db, "records_d3"), { ...data, createdAt: Date.now() }));
-    closeModal("modal_d3_record");
-    toastCommit(result, "已儲存");
-});
-
-// ---------- 手動加 / 扣分 ----------
-
-function reasonOptions(selected) {
-    return campColumns(settings).map(d => `<optgroup label="${esc(d.day)}">${d.cols.map((c, i) =>
-        `<option value="${esc(d.keys[i])}"${d.keys[i] === selected ? " selected" : ""}>${esc(c)}${c === D2_COLUMN || c === D3_COLUMN ? "（調整遊戲分）" : ""}</option>`).join("")}</optgroup>`).join("");
-}
-
-$("score_addBonusBtn").addEventListener("click", () => {
-    $("bonus_team").innerHTML = teamOptions(settings.numTeams, $("bonus_team").value);
-    $("bonus_reason").innerHTML = reasonOptions($("bonus_reason").value);
-    $("bonus_val").value = "";
-    openModal("modal_bonus");
-});
-
-$("save_bonus").addEventListener("click", async () => {
-    const team = $("bonus_team").value, reason = $("bonus_reason").value, val = int("bonus_val", NaN);
-    if (!reason) return toast("請選擇計分項目", "warn");
-    if (Number.isNaN(val) || val === 0) return toast("請輸入分數", "warn");
-    const result = await commit(addDoc(collection(db, "records_bonus"), { team, reason, val, timestamp: Date.now() }));
-    closeModal("modal_bonus");
-    toastCommit(result, `${team} ${val > 0 ? "+" : ""}${val} 已記錄`);
-});
-
-// ---------- 總積分大表 ----------
+// ---------- 總積分 ----------
 
 function renderTotals() {
-    if (!settings) return;
-    const t = computeTotals(settings, recordsD2, recordsD3, recordsBonus);
+    const live = $("liveToggle").checked;
+    const t = computeCampTotals(settings, games, bonus, { live });
     lastTotals = t;
     const hasUncat = t.uncategorizedRecords.length > 0;
+    const gameKeys = Object.values(t.gameKeys);
 
     $("tableHead").innerHTML = `
         <tr>
@@ -426,131 +112,370 @@ function renderTotals() {
             <td class="sticky-2 num">${row.total}</td>
             ${t.columns.map(d => d.keys.length
                 ? d.keys.map((k, i) => {
-                    const cls = [i === 0 ? "day-start" : "", k === t.d2Key || k === t.d3Key ? "game" : ""].join(" ").trim();
-                    return `<td class="${cls}">${row.cells[k] || ""}</td>`;
+                    const pending = row.pending[k];
+                    const cls = [i === 0 ? "day-start" : "", gameKeys.includes(k) ? "game" : "", pending !== undefined ? "pending" : ""].join(" ").trim();
+                    const text = pending !== undefined ? (pending ? `(${pending})` : "") : (row.cells[k] || "");
+                    return `<td class="${cls}">${text}</td>`;
                 }).join("")
                 : `<td class="day-start"></td>`).join("")}
             ${hasUncat ? `<td class="day-start uncat">${row.uncategorized || ""}</td>` : ""}
         </tr>`).join("");
 
+    const unpublished = GAME_IDS.filter(g => t.gameKeys[g] && !gameConfig(settings, g).published && games.some(r => r.game === g && !r.deleted));
+    $("publishNotice").hidden = !unpublished.length || live;
+    $("publishNotice").textContent = unpublished.length
+        ? `${unpublished.map(g => GAME_LABELS[g]).join("、")} 的大地分數還沒公布，括號裡的數字目前沒有算進總分。確認無誤後，到該場的分頁按「公布分數」。`
+        : "";
     $("uncatNotice").hidden = !hasUncat;
-    if (hasUncat) {
-        $("uncatNotice").innerHTML = `有 ${t.uncategorizedRecords.length} 筆加分對不上大表欄位，暫時放在「${UNCATEGORIZED}」（仍有算進總分）。<button class="btn btn-ghost" id="openUncat">查看並歸類</button>`;
-        $("openUncat").addEventListener("click", openUncat);
+    $("uncatNotice").textContent = hasUncat
+        ? `有 ${t.uncategorizedRecords.length} 筆加分對不上大表欄位，暫時放在「${UNCATEGORIZED}」（仍有算進總分）。到「加分紀錄」分頁按「改」選一個項目就能歸位。`
+        : "";
+}
+$("liveToggle").addEventListener("change", renderTotals);
+
+// ---------- D2 / D3 大地遊戲 ----------
+
+function renderGame(game) {
+    if (!settings) return;
+    const panel = $(`${game}-panel`);
+    const g = gameConfig(settings, game);
+    const v = view[game];
+    const mine = games.filter(r => r.game === game);
+    const active = state.active[game] || {};
+    const rounds = state.rounds[game] || {};
+
+    const tiles = Object.keys(g.stations).map(Number).map(st => {
+        const cfg = g.stations[st];
+        const busy = active[st];
+        const count = mine.filter(r => r.station === st && !r.deleted).length;
+        const round = rounds[st] || 1;
+        const next = scheduledTeams(settings, game, round, st);
+        return `
+            <button class="st-tile ${busy ? "busy" : ""} ${v.station === st ? "picked" : ""}" data-pick="${st}">
+                <span class="st-no">${String(st).padStart(2, "0")}</span>
+                <span class="st-info">
+                    <b>${esc(cfg.name || GAME_TYPES[cfg.type].label)}</b>
+                    <small>${busy ? `闖關中：${esc((busy.teams || []).join("、"))}` : "空關"}${g.maxRounds > 1 ? `・第 ${round} 輪${next ? `（${esc(next.join(" vs "))}）` : ""}` : ""}</small>
+                </span>
+                <span class="st-count num">${count}</span>
+            </button>`;
+    }).join("");
+
+    const shown = mine
+        .filter(r => (v.showDeleted || !r.deleted) && (v.station === null || r.station === v.station))
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    const rows = shown.map(r => {
+        const cfg = g.stations[r.station];
+        const error = cfg ? validateRecord(r, cfg, settings.numTeams) : "這一關已經不存在";
+        const pts = error ? {} : recordPoints(r, cfg);
+        const teams = (r.teams || []).map(t => `${esc(t)}${error ? "" : ` <span class="num">${signed(pts[t])}</span>`}`).join("、");
+        const likes = Object.entries(r.likes || {}).map(([t, n]) => `${esc(t)} ${n}`).join("、");
+        return `
+            <tr class="${r.deleted ? "deleted" : ""}">
+                <td>${r.station}</td>
+                ${g.maxRounds > 1 ? `<td>${r.round || 1}</td>` : ""}
+                <td class="wrap">${teams}</td>
+                <td class="wrap">${error ? `<span class="warn">無效：${esc(error)}</span>` : esc(resultText(r, cfg))}</td>
+                <td class="wrap">${likes}</td>
+                <td>${esc(r.by || "")}</td>
+                <td>${fmtTime(r.createdAt)}${r.editedAt ? "（已修改）" : ""}</td>
+                <td class="actions">${r.deleted
+                    ? `<button class="btn btn-ghost" data-restore="${esc(r.id)}">復原</button>`
+                    : `<button class="btn btn-ghost" data-edit="${esc(r.id)}">改</button><button class="btn btn-ghost danger" data-del="${esc(r.id)}">刪</button>`}</td>
+            </tr>`;
+    }).join("");
+
+    const busyHere = v.station !== null && active[v.station];
+    panel.innerHTML = `
+        <div class="toolbar">
+            <button class="btn btn-outline" data-act="settings">關卡設定</button>
+            <button class="btn btn-outline" data-act="schedule">賽程表</button>
+            <button class="btn btn-outline" data-act="add">新增紀錄</button>
+            <button class="btn btn-outline" data-act="export">匯出</button>
+            <span class="spacer"></span>
+            <span class="state">關主輸入：<b>${g.locked ? "已鎖定" : "開放中"}</b>　分數：<b>${g.published ? "已公布" : "未公布"}</b></span>
+            <button class="btn btn-outline" data-act="lock">${g.locked ? "開放輸入" : "鎖定輸入"}</button>
+            <button class="btn ${g.published ? "btn-outline" : "btn-primary"}" data-act="publish">${g.published ? "取消公布" : "公布分數"}</button>
+            <button class="btn btn-danger" data-act="clear">清空</button>
+        </div>
+        <div class="st-tiles">${tiles}</div>
+        <div class="toolbar">
+            <b>${v.station === null ? "全部關卡的紀錄" : esc(stationLabel(v.station, g.stations[v.station]))}</b>
+            ${v.station !== null ? `<button class="btn btn-ghost" data-pick="all">看全部</button>` : ""}
+            ${busyHere ? `<button class="btn btn-ghost" data-act="free">把這一關改回空關</button>` : ""}
+            <span class="spacer"></span>
+            <label class="check"><input type="checkbox" data-act="showDeleted" ${v.showDeleted ? "checked" : ""}> 顯示已刪除</label>
+        </div>
+        <div class="table-wrap">
+            <table class="rec-table">
+                <thead><tr><th>關</th>${g.maxRounds > 1 ? "<th>輪</th>" : ""}<th>隊伍與得分</th><th>結果</th><th>讚</th><th>記錄者</th><th>時間</th><th></th></tr></thead>
+                <tbody>${rows || `<tr><td colspan="8" class="empty">還沒有紀錄</td></tr>`}</tbody>
+            </table>
+        </div>`;
+}
+
+for (const game of GAME_IDS) {
+    const panel = $(`${game}-panel`);
+    const find = id => games.find(r => r.id === id);
+
+    panel.addEventListener("change", e => {
+        if (e.target.dataset.act === "showDeleted") { view[game].showDeleted = e.target.checked; renderGame(game); }
+    });
+
+    panel.addEventListener("click", async e => {
+        const btn = e.target.closest("button");
+        if (!btn) return;
+        const d = btn.dataset, g = gameConfig(settings, game), label = GAME_LABELS[game];
+
+        if (d.pick) { view[game].station = d.pick === "all" ? null : Number(d.pick); return renderGame(game); }
+        if (d.edit) return openRecord(game, find(d.edit));
+        if (d.del && confirm("確定刪除這筆紀錄？之後可以在「顯示已刪除」裡復原。")) return run(deleteRecord(GAME, find(d.del), auditBy), "已刪除");
+        if (d.restore) return run(restoreRecord(GAME, find(d.restore), auditBy), "已復原");
+
+        switch (d.act) {
+            case "settings": return openGameSettings(game);
+            case "schedule": return openSchedule(game);
+            case "add": return openRecord(game, null);
+            case "export": return exportGame(game);
+            case "free": return run(clearStation(game, view[game].station), "已改回空關");
+            case "lock": return run(commit(updateDoc(settingsRef, { [`games.${game}.locked`]: !g.locked })));
+            case "publish":
+                if (!g.published && !confirm(`確定公布 ${label} 的大地分數？公布後會算進各隊的正式總分。`)) return;
+                return run(commit(updateDoc(settingsRef, { [`games.${game}.published`]: !g.published })), g.published ? "已取消公布" : "已公布");
+            case "clear":
+                if (prompt(`這會永久刪除 ${label} 的全部紀錄（包含已刪除的），無法復原。\n請輸入「確認」繼續`) !== "確認") return;
+                return run(clearGame(game).then(n => { toast(`已清空 ${n} 筆`); }));
+        }
+    });
+}
+
+// ---------- 大地遊戲設定 ----------
+
+let editingGame = null;
+
+function stationRowHtml(st, cfg) {
+    const versus = cfg.type === "versus";
+    const points = versus ? cfg.rankPts.join(", ") : formatLevels(cfg.levels);
+    return `
+        <div class="cfg-row" data-st="${st}">
+            <b class="num">${st}</b>
+            <input data-f="name" placeholder="關卡名稱" value="${esc(cfg.name)}">
+            <input data-f="place" placeholder="位置" value="${esc(cfg.place)}">
+            <select data-f="type">${Object.entries(GAME_TYPES).map(([k, t]) => `<option value="${k}"${k === cfg.type ? " selected" : ""}>${t.label}</option>`).join("")}</select>
+            <input type="number" data-f="teams" title="每場幾隊" min="${GAME_TYPES[cfg.type].minTeams}" max="${GAME_TYPES[cfg.type].maxTeams}" value="${cfg.teamsPerMatch}" ${cfg.type === "solo" ? "disabled" : ""}>
+            <input data-f="points" placeholder="${versus ? "100, 50" : "過關=100"}" value="${esc(points)}">
+            <input type="number" data-f="tie" placeholder="平手" title="全部平手時每隊幾分（可不填）" value="${versus && cfg.tiePts !== null ? cfg.tiePts : ""}" ${versus ? "" : "disabled"}>
+        </div>`;
+}
+
+function readStationRow(row) {
+    const f = name => row.querySelector(`[data-f="${name}"]`);
+    const type = f("type").value;
+    const raw = { name: f("name").value, place: f("place").value, type, teamsPerMatch: int(f("teams"), undefined) };
+    if (type === "versus") {
+        raw.rankPts = parseNumberList(f("points").value);
+        raw.tiePts = f("tie").value === "" ? null : int(f("tie"), null);
+    } else {
+        raw.levels = parseLevels(f("points").value);
     }
-    if ($("modal_uncat").classList.contains("open")) renderUncatList();
+    return normalizeStation(raw);
 }
 
-function renderUncatList() {
-    const recs = lastTotals.uncategorizedRecords;
-    $("uncat_list").innerHTML = recs.length ? recs.map(r => `
-        <li>
-            <div>
-                <div class="main">${esc(r.team)}　<span class="num">${esc(r.val)}</span></div>
-                <div class="meta">原項目：${esc(r.reason || "（空白）")}${r.npc ? `・NPC ${esc(r.npc)}` : ""}</div>
-            </div>
-            <select data-reassign="${esc(r.id)}" style="width:auto; max-width:50%;"><option value="">移到…</option>${reasonOptions("")}</select>
-        </li>`).join("") : `<li class="empty">都歸類好了</li>`;
+function renderStationRows(n, source) {
+    const rows = [];
+    for (let st = 1; st <= n; st++) rows.push(stationRowHtml(st, source[st] || normalizeStation()));
+    $("game_station_rows").innerHTML = `
+        <div class="cfg-row cfg-head"><span></span><span>名稱</span><span>位置</span><span>類型</span><span>隊數</span><span>分數</span><span>平手</span></div>
+        ${rows.join("")}`;
 }
-function openUncat() { renderUncatList(); openModal("modal_uncat"); }
 
-$("uncat_list").addEventListener("change", async e => {
-    const id = e.target.dataset.reassign;
-    if (!id || !e.target.value) return;
-    await commit(updateDoc(doc(db, "records_bonus", id), { reason: e.target.value }));
-    toast("已歸類");
+const currentRows = () => Object.fromEntries([...document.querySelectorAll("#game_station_rows [data-st]")].map(row => [row.dataset.st, readStationRow(row)]));
+
+function openGameSettings(game) {
+    editingGame = game;
+    const g = gameConfig(settings, game);
+    $("game_title").textContent = `${GAME_LABELS[game]} 大地遊戲設定`;
+    $("game_stations").value = g.numStations;
+    $("game_rounds").value = g.maxRounds;
+    $("game_maxLikes").value = g.maxLikes;
+    $("game_likePts").value = g.likePts;
+    renderStationRows(g.numStations, g.stations);
+    openModal("modal_game");
+}
+
+$("game_stations").addEventListener("input", () => {
+    const n = int("game_stations", 0);
+    if (n >= 1 && n <= 40) renderStationRows(n, currentRows());
 });
 
-// ---------- 匯出 CSV ----------
+// 換類型時，隊數和分數欄位換成那個類型的預設值
+$("game_station_rows").addEventListener("change", e => {
+    if (e.target.dataset.f !== "type") return;
+    const row = e.target.closest("[data-st]");
+    const f = name => row.querySelector(`[data-f="${name}"]`);
+    row.outerHTML = stationRowHtml(row.dataset.st, normalizeStation({ name: f("name").value, place: f("place").value, type: e.target.value }));
+});
 
-function downloadCsv(filename, rows) {
-    const cell = v => {
-        const s = String(v ?? "");
-        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+$("game_copyFirst").addEventListener("click", () => {
+    const rows = currentRows();
+    const first = rows[1];
+    if (!first) return;
+    for (const st of Object.keys(rows)) rows[st] = { ...first, name: rows[st].name, place: rows[st].place };
+    renderStationRows(Object.keys(rows).length, rows);
+});
+
+$("game_save").addEventListener("click", async () => {
+    const game = editingGame, old = gameConfig(settings, game);
+    const stations = currentRows();
+    const data = {
+        numStations: Object.keys(stations).length,
+        maxRounds: Math.max(1, int("game_rounds", old.maxRounds)),
+        maxLikes: Math.max(0, int("game_maxLikes", old.maxLikes)),
+        likePts: int("game_likePts", old.likePts),
+        published: old.published,
+        locked: old.locked,
+        stations
     };
-    const csv = "﻿" + rows.map(r => r.map(cell).join(",")).join("\n");
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
-    link.download = filename;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    if (await run(commit(updateDoc(settingsRef, { [`games.${game}`]: data })), "設定已儲存")) closeModal("modal_game");
+});
+
+// ---------- 賽程表 ----------
+
+function openSchedule(game) {
+    editingGame = game;
+    const rounds = Object.keys(settings.schedule?.[game] || {}).length;
+    $("schedule_title").textContent = `${GAME_LABELS[game]} 賽程表`;
+    $("schedule_current").textContent = rounds ? `目前已匯入 ${rounds} 輪的賽程。重新匯入會整份覆蓋。` : "目前還沒有賽程表（沒有賽程表也可以玩，關主自己選隊伍）。";
+    $("schedule_input").value = "";
+    openModal("modal_schedule");
 }
-const fullTime = ts => ts ? new Date(ts).toLocaleString("zh-TW") : "";
 
-$("d2_exportBtn").addEventListener("click", () => {
-    downloadCsv("D2_紀錄.csv", [
-        ["關卡", "隊伍", "數值", "顯示", "讚數", "時間"],
-        ...recordsD2.filter(r => !r.isLikeOnly).sort((a, b) => a.station - b.station || a.createdAt - b.createdAt)
-            .map(r => [`第${r.station}關`, r.team, r.val, formatD2Value(r.val, d2StationConfig(settings, r.station)), r.likes || 0, fullTime(r.createdAt)])
-    ]);
+$("schedule_save").addEventListener("click", async () => {
+    const schedule = parseScheduleTeams($("schedule_input").value);
+    const rounds = Object.keys(schedule);
+    // 格式錯誤時不要覆蓋掉原本的賽程表
+    if (!rounds.length) return toast("看不懂這份賽程表，請確認每輪開頭有「第1輪」並用 Tab 分隔", "error");
+    const matches = rounds.reduce((n, r) => n + Object.keys(schedule[r]).length, 0);
+    if (!confirm(`解析出 ${rounds.length} 輪、共 ${matches} 場，確定覆蓋目前的賽程表？`)) return;
+    if (await run(commit(updateDoc(settingsRef, { [`schedule.${editingGame}`]: schedule })), "賽程表已匯入")) closeModal("modal_schedule");
 });
 
-$("d3_exportBtn").addEventListener("click", () => {
-    downloadCsv("D3_紀錄.csv", [
-        ["輪次", "關卡", "隊伍A", "隊伍B", "獲勝", "落敗", "A讚", "B讚", "時間"],
-        ...[...recordsD3].sort((a, b) => a.round - b.round || a.station - b.station)
-            .map(r => [`第${r.round}輪`, `第${r.station}關`, r.teamA, r.teamB, r.winner, d3Loser(r), r.likesA || 0, r.likesB || 0, fullTime(r.createdAt)])
-    ]);
+// ---------- 大地紀錄新增 / 編輯 ----------
+
+let editingRecord = null;
+
+function renderRecordFields() {
+    const g = gameConfig(settings, editingGame);
+    const st = Number($("record_station").value);
+    const rec = editingRecord && editingRecord.station === st ? editingRecord : {};
+    $("record_fields").innerHTML = recordFormHtml(g.stations[st], g, settings.numTeams, rec);
+    $("record_error").textContent = "";
+}
+
+function openRecord(game, rec) {
+    editingGame = game;
+    editingRecord = rec;
+    const g = gameConfig(settings, game);
+    const st = rec ? rec.station : (view[game].station || 1);
+    $("record_title").textContent = `${GAME_LABELS[game]}：${rec ? "編輯紀錄" : "新增紀錄"}`;
+    $("record_station").innerHTML = Object.keys(g.stations).map(Number)
+        .map(n => `<option value="${n}"${n === st ? " selected" : ""}>${esc(stationLabel(n, g.stations[n]))}</option>`).join("");
+    $("record_roundField").hidden = g.maxRounds <= 1;
+    $("record_round").value = rec?.round || 1;
+    renderRecordFields();
+    openModal("modal_record");
+}
+$("record_station").addEventListener("change", renderRecordFields);
+
+$("record_save").addEventListener("click", async () => {
+    const game = editingGame, g = gameConfig(settings, game);
+    const station = Number($("record_station").value), cfg = g.stations[station];
+    const data = { station, round: Math.max(1, int("record_round", 1)), ...readRecordForm($("record_fields"), cfg, g) };
+    const error = validateRecord(data, cfg, settings.numTeams);
+    if (error) { $("record_error").textContent = error; return; }
+    const job = editingRecord
+        ? updateRecord(GAME, editingRecord, data, auditBy)
+        : createRecord(GAME, { game, ...data, by: ADMIN_NAME, createdAt: Date.now() }, auditBy);
+    if (await run(job, "已儲存")) closeModal("modal_record");
 });
 
-$("exportTableBtn").addEventListener("click", () => {
-    const t = lastTotals;
-    const hasUncat = t.uncategorizedRecords.length > 0;
-    downloadCsv("總積分大表.csv", [
-        ["隊伍", "總分", ...t.columns.flatMap(d => d.cols.map(c => `${d.day} ${c}`)), ...(hasUncat ? [UNCATEGORIZED] : [])],
-        ...t.rows.map(row => [row.team, row.total, ...t.keys.map(k => row.cells[k]), ...(hasUncat ? [row.uncategorized] : [])])
-    ]);
+// ---------- 加分紀錄 ----------
+
+function reasonOptions(selected) {
+    return campColumns(settings).map(d => `<optgroup label="${esc(d.day)}">${d.cols.map((c, i) =>
+        `<option value="${esc(d.keys[i])}"${d.keys[i] === selected ? " selected" : ""}>${esc(c)}</option>`).join("")}</optgroup>`).join("");
+}
+
+function renderBonus() {
+    const showDeleted = $("bonusShowDeleted").checked;
+    const columns = campColumns(settings);
+    const rows = bonus.filter(r => showDeleted || !r.deleted).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).map(r => {
+        const uncat = resolveBonusKey(r, columns) === UNCATEGORIZED;
+        return `
+            <tr class="${r.deleted ? "deleted" : ""}">
+                <td>${fmtTime(r.timestamp)}${r.editedAt ? "（已修改）" : ""}</td>
+                <td>${esc(r.team)}</td>
+                <td class="wrap">${esc(String(r.reason || "").replace("_", " "))}${uncat ? ` <span class="warn">對不上欄位</span>` : ""}</td>
+                <td class="num">${signed(Number(r.val) || 0)}</td>
+                <td>${esc(r.npc || ADMIN_NAME)}</td>
+                <td class="actions">${r.deleted
+                    ? `<button class="btn btn-ghost" data-restore="${esc(r.id)}">復原</button>`
+                    : `<button class="btn btn-ghost" data-edit="${esc(r.id)}">改</button><button class="btn btn-ghost danger" data-del="${esc(r.id)}">刪</button>`}</td>
+            </tr>`;
+    }).join("");
+    $("bonusTable").innerHTML = `
+        <thead><tr><th>時間</th><th>隊伍</th><th>項目</th><th>分數</th><th>記錄者</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="6" class="empty">還沒有加分紀錄</td></tr>`}</tbody>`;
+}
+$("bonusShowDeleted").addEventListener("change", renderBonus);
+
+let editingBonus = null;
+function openBonus(rec) {
+    editingBonus = rec;
+    $("bonus_title").textContent = rec ? "編輯加分" : "手動加 / 扣分";
+    $("bonus_team").innerHTML = teamOptions(settings.numTeams, rec ? rec.team : $("bonus_team").value);
+    $("bonus_reason").innerHTML = reasonOptions(rec ? rec.reason : $("bonus_reason").value);
+    $("bonus_val").value = rec ? rec.val : "";
+    openModal("modal_bonus");
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-add-bonus]")) openBonus(null); });
+
+$("bonusTable").addEventListener("click", e => {
+    const d = e.target.closest("button")?.dataset;
+    if (!d) return;
+    const find = id => bonus.find(r => r.id === id);
+    if (d.edit) openBonus(find(d.edit));
+    if (d.del && confirm("確定刪除這筆加分？之後可以在「顯示已刪除」裡復原。")) run(deleteRecord(BONUS, find(d.del), auditBy), "已刪除");
+    if (d.restore) run(restoreRecord(BONUS, find(d.restore), auditBy), "已復原");
 });
 
-$("exportAllBtn").addEventListener("click", () => {
-    downloadCsv("全部明細.csv", [
-        ["類別", "項目", "關卡/輪次", "隊伍", "結果", "讚數", "紀錄者", "時間"],
-        ...recordsD2.filter(r => !r.isLikeOnly).map(r => ["D2", "", `第${r.station}關`, r.team, formatD2Value(r.val, d2StationConfig(settings, r.station)), r.likes || 0, "關主", fullTime(r.createdAt)]),
-        ...recordsD3.map(r => ["D3", `第${r.round}輪`, `第${r.station}關`, `${r.teamA} vs ${r.teamB}`, `${r.winner} 勝`, `${r.likesA || 0}:${r.likesB || 0}`, "關主", fullTime(r.createdAt)]),
-        ...recordsBonus.map(r => ["加分", r.reason, "", r.team, r.val, "", r.npc || "總控台", fullTime(r.timestamp)])
-    ]);
+$("bonus_save").addEventListener("click", async () => {
+    const team = $("bonus_team").value, reason = $("bonus_reason").value, val = int("bonus_val", NaN);
+    if (!reason) return toast("請選擇計分項目", "warn");
+    if (Number.isNaN(val) || val === 0) return toast("請輸入分數", "warn");
+    const job = editingBonus
+        ? updateRecord(BONUS, editingBonus, { team, reason, val }, auditBy)
+        : createRecord(BONUS, { team, reason, val, timestamp: Date.now() }, auditBy);
+    if (await run(job, `${team} ${signed(val)} 已儲存`)) closeModal("modal_bonus");
 });
-
-// ---------- 營前演練用：在 console 輸入 runCornerTest() 灌入假資料（會寫進真的資料庫） ----------
-
-window.runCornerTest = async () => {
-    if (prompt("這會在真實資料庫灌入大量測試資料，請輸入「確認」") !== "確認") return;
-    const s = settings, teams = teamList(s.numTeams), jobs = [];
-    for (let st = 1; st <= s.numStations_d2; st++) {
-        for (const team of teams) {
-            jobs.push(addDoc(collection(db, "records_d2"), { station: st, team, val: Math.floor(Math.random() * 300 + 60), likes: Math.floor(Math.random() * (s.d2_maxLikes + 1)), createdAt: Date.now() }));
-        }
-    }
-    for (let round = 1; round <= s.d3_maxRounds; round++) {
-        for (let st = 1; st <= s.numStations_d3; st++) {
-            const m = d3Match(s, round, st) || { a: teams[(st * 2 - 2) % teams.length], b: teams[(st * 2 - 1) % teams.length] };
-            const winner = Math.random() > 0.5 ? m.a : m.b;
-            const likesA = Math.floor(Math.random() * (s.d3_maxLikes + 1));
-            jobs.push(addDoc(collection(db, "records_d3"), { station: st, round, teamA: m.a, teamB: m.b, winner, loser: winner === m.a ? m.b : m.a, likesA, likesB: Math.floor(Math.random() * (s.d3_maxLikes - likesA + 1)), createdAt: Date.now() }));
-        }
-    }
-    const keys = campColumns(s).flatMap(d => d.keys);
-    for (const team of teams) {
-        jobs.push(addDoc(collection(db, "records_bonus"), { team, reason: keys[Math.floor(Math.random() * keys.length)], val: Math.floor(Math.random() * 200), timestamp: Date.now() }));
-    }
-    await Promise.all(jobs);
-    toast(`已灌入 ${jobs.length} 筆測試資料`);
-};
 
 // ---------- 工作人員名單與登入中的人 ----------
 
 let roster = {}, sessions = [], rosterDirty = false;
 
-const rosterInput = (role, st) => `
+const rosterInput = (role, st, cfg) => `
     <div class="roster-row">
-        <label for="roster_${role}_${st}">第 ${st} 關</label>
+        <label for="roster_${role}_${st}">第 ${st} 關${cfg.name ? `<small>${esc(cfg.name)}</small>` : ""}</label>
         <input type="text" id="roster_${role}_${st}" data-roster="${rosterKey(role, st)}" value="${esc((roster[rosterKey(role, st)] || []).join(", "))}" placeholder="關主名字">
     </div>`;
 
 function renderRoster() {
     if (!settings || rosterDirty) return;
-    $("roster_d2").innerHTML = Array.from({ length: settings.numStations_d2 }, (_, i) => rosterInput("d2", i + 1)).join("");
-    $("roster_d3").innerHTML = Array.from({ length: settings.numStations_d3 }, (_, i) => rosterInput("d3", i + 1)).join("");
+    for (const game of GAME_IDS) {
+        const g = gameConfig(settings, game);
+        $(`roster_${game}`).innerHTML = Object.keys(g.stations).map(Number).map(st => rosterInput(game, st, g.stations[st])).join("");
+    }
     $("roster_npc").value = (roster.npc || []).join(", ");
     $("staffUrl").textContent = new URL("staff.html", location.href).href;
 }
@@ -573,26 +498,14 @@ document.addEventListener("input", e => { if (e.target.closest("#staff-panel inp
 
 $("saveRosterBtn").addEventListener("click", async () => {
     const batch = writeBatch(db);
-    document.querySelectorAll("[data-roster]").forEach(el => {
-        batch.set(doc(db, "staff", el.dataset.roster), { names: parseNames(el.value) });
-    });
+    document.querySelectorAll("[data-roster]").forEach(el => batch.set(doc(db, "staff", el.dataset.roster), { names: parseNames(el.value) }));
     batch.set(doc(db, "staff", "npc"), { names: parseNames($("roster_npc").value) });
-    try {
-        const result = await commit(batch.commit());
-        rosterDirty = false;
-        renderRoster();
-        toastCommit(result, "名單已儲存");
-    } catch (err) {
-        console.error(err);
-        toast("儲存失敗，請確認網路與管理員權限", "error");
-    }
+    if (await run(commit(batch.commit()), "名單已儲存")) { rosterDirty = false; renderRoster(); }
 });
 
-$("sessionList").addEventListener("click", async e => {
+$("sessionList").addEventListener("click", e => {
     const id = e.target.closest("[data-kick]")?.dataset.kick;
-    if (id && confirm("確定要強制登出？對方需要重新輸入名字才能繼續。")) {
-        await commit(deleteDoc(doc(db, "sessions", id)));
-    }
+    if (id && confirm("確定要強制登出？對方需要重新輸入名字才能繼續。")) run(commit(deleteDoc(doc(db, "sessions", id))));
 });
 
 const permissionHint = err => {
@@ -605,3 +518,100 @@ watchCollection("staff", list => {
     renderSessions();
 }, permissionHint);
 watchCollection("sessions", list => { sessions = list; renderSessions(); }, permissionHint);
+
+// ---------- 設定 ----------
+
+let setupDirty = false;
+function renderSetup() {
+    if (!settings || setupDirty) return;
+    $("set_teams").value = settings.numTeams;
+    $("colsFields").innerHTML = campColumns(settings).map((d, i) => `
+        <div class="field"><label class="label">${esc(d.day)}</label><input type="text" id="set_cols_d${i + 1}" value="${esc(d.cols.join(","))}"></div>`).join("");
+}
+$("setup-panel").addEventListener("input", () => { setupDirty = true; });
+
+$("saveCampBtn").addEventListener("click", async () => {
+    const teams = int("set_teams", settings.numTeams);
+    if (teams < 2) return toast("隊伍數至少要 2", "warn");
+    const fields = { numTeams: teams };
+    CAMP.days.forEach((_, i) => { fields[`cols_d${i + 1}`] = $(`set_cols_d${i + 1}`).value.trim(); });
+    if (await run(commit(setDoc(settingsRef, fields, { merge: true })), "已儲存")) { setupDirty = false; renderSetup(); }
+});
+
+$("practiceOnBtn").addEventListener("click", () => {
+    if (confirm("開啟練習模式？\n開啟後所有人輸入的都是練習資料，正式資料不會被動到。")) run(commit(updateDoc(settingsRef, { practiceMode: true })), "已開啟練習模式");
+});
+$("practiceOffBtn").addEventListener("click", () => {
+    if (confirm("結束練習模式，回到正式資料？")) run(commit(updateDoc(settingsRef, { practiceMode: false })), "已回到正式資料");
+});
+$("clearPracticeBtn").addEventListener("click", () => {
+    if (confirm("清空全部練習資料？正式資料不受影響。")) run(clearPracticeData().then(n => { toast(`已清空 ${n} 筆練習資料`); }));
+});
+
+// ---------- 匯出 CSV ----------
+
+function downloadCsv(filename, rows) {
+    const cell = v => {
+        const s = String(v ?? "");
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob(["﻿" + rows.map(r => r.map(cell).join(",")).join("\n")], { type: "text/csv;charset=utf-8;" }));
+    link.download = filename;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+// 一隊一列，方便用 Excel 分析
+function gameRows(game) {
+    const g = gameConfig(settings, game);
+    return games.filter(r => r.game === game).sort((a, b) => a.station - b.station || (a.createdAt || 0) - (b.createdAt || 0)).flatMap(r => {
+        const cfg = g.stations[r.station];
+        const error = cfg ? validateRecord(r, cfg, settings.numTeams) : "關卡不存在";
+        const pts = error ? {} : recordPoints(r, cfg);
+        const status = r.deleted ? "已刪除" : error ? `無效：${error}` : "有效";
+        return (r.teams || []).map(t => [
+            GAME_LABELS[game], r.station, cfg?.name || "", r.round || 1, t,
+            error ? "" : resultText(r, cfg), error ? "" : pts[t], r.likes?.[t] || 0, r.by || "", fullTime(r.createdAt), status
+        ]);
+    });
+}
+const GAME_HEAD = ["場次", "關卡", "關卡名稱", "輪次", "隊伍", "結果", "得分", "讚", "記錄者", "時間", "狀態"];
+const bonusRows = () => [...bonus].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+    .map(r => [r.team, r.reason, r.val, r.npc || ADMIN_NAME, fullTime(r.timestamp), r.deleted ? "已刪除" : "有效"]);
+const BONUS_HEAD = ["隊伍", "項目", "分數", "記錄者", "時間", "狀態"];
+
+const exportGame = game => downloadCsv(`${GAME_LABELS[game]}_大地紀錄.csv`, [GAME_HEAD, ...gameRows(game)]);
+$("exportBonusBtn").addEventListener("click", () => downloadCsv("加分紀錄.csv", [BONUS_HEAD, ...bonusRows()]));
+
+$("exportTableBtn").addEventListener("click", () => {
+    const t = lastTotals, hasUncat = t.uncategorizedRecords.length > 0;
+    downloadCsv("總積分大表.csv", [
+        ["隊伍", "總分", ...t.columns.flatMap(d => d.cols.map(c => `${d.day} ${c}`)), ...(hasUncat ? [UNCATEGORIZED] : [])],
+        ...t.rows.map(row => [row.team, row.total, ...t.keys.map(k => row.cells[k]), ...(hasUncat ? [row.uncategorized] : [])])
+    ]);
+});
+
+$("exportAllBtn").addEventListener("click", () => {
+    downloadCsv("全部明細.csv", [
+        ["類別", ...GAME_HEAD],
+        ...GAME_IDS.flatMap(g => gameRows(g).map(r => ["大地", ...r])),
+        [],
+        ["類別", ...BONUS_HEAD],
+        ...bonusRows().map(r => ["加分", ...r])
+    ]);
+});
+
+$("exportAuditBtn").addEventListener("click", async () => {
+    try {
+        const list = (await fetchAudit()).sort((a, b) => a.at - b.at);
+        downloadCsv("修改紀錄.csv", [
+            ["時間", "動作", "資料", "紀錄編號", "操作者", "修改前", "修改後"],
+            ...list.map(a => [fullTime(a.at), AUDIT_LABELS[a.action] || a.action, a.collection === GAME ? "大地紀錄" : "加分", a.recordId, a.by,
+                a.before ? JSON.stringify(a.before) : "", a.after ? JSON.stringify(a.after) : ""])
+        ]);
+    } catch (err) {
+        console.error(err);
+        toast("讀不到修改紀錄，請確認網路與管理員權限", "error");
+    }
+});

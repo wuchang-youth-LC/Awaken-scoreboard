@@ -67,6 +67,7 @@ export function gameConfig(settings, game) {
         maxLikes: Math.max(0, num(raw.maxLikes, DEFAULT_GAME.maxLikes)),
         likePts: num(raw.likePts, DEFAULT_GAME.likePts),
         published: raw.published === true,
+        locked: raw.locked === true,
         stations
     };
 }
@@ -233,3 +234,51 @@ export function auditEntry(action, collection, id, before, after, by, at = Date.
 }
 
 export const AUDIT_LABELS = { create: "新增", update: "修改", delete: "刪除", restore: "復原" };
+
+// ---------- 總控台設定用的文字格式 ----------
+
+// 「過關=100, 完美過關=150」→ [{ label, pts }]
+export function parseLevels(text) {
+    return String(text ?? "").split(/[,，\n]+/).map(s => s.trim()).filter(Boolean).map(s => {
+        const m = s.match(/^(.*?)\s*[=＝:：]\s*(-?\d+)$/);
+        return m && m[1].trim() ? { label: m[1].trim(), pts: parseInt(m[2], 10) } : null;
+    }).filter(Boolean);
+}
+export const formatLevels = levels => (levels || []).map(l => `${l.label}=${l.pts}`).join(", ");
+
+// 「100, 50, 30」→ [100, 50, 30]
+export function parseNumberList(text) {
+    return String(text ?? "").split(/[,，\s]+/).filter(Boolean).map(Number).filter(Number.isFinite);
+}
+
+// 從 Excel 貼上的賽程表：每一輪的第一列開頭是「第1輪」，
+// 同一欄往下是同一關的隊伍（兩隊對抗就兩列、四隊對抗就四列），第 N 欄 = 第 N 關
+export function parseScheduleTeams(text) {
+    const lines = String(text ?? "").split(/\r?\n/).map(l => l.trimEnd());
+    const schedule = {};
+    let round = null, rows = [];
+    const flush = () => {
+        if (round === null) return;
+        const matches = {};
+        const width = Math.max(0, ...rows.map(r => r.length));
+        for (let c = 0; c < width; c++) {
+            const teams = rows.map(r => (r[c] || "").trim()).filter(Boolean).map(v => (/^\d+$/.test(v) ? `第${v}隊` : v));
+            if (teams.length) matches[c + 1] = teams;
+        }
+        if (Object.keys(matches).length) schedule[round] = matches;
+    };
+    for (const line of lines) {
+        const cols = line.split("\t");
+        const head = cols[0].trim();
+        const m = head.startsWith("第") && head.includes("輪") ? head.match(/\d+/) : null;
+        if (m) {
+            flush();
+            round = parseInt(m[0], 10);
+            rows = [cols.slice(1)];
+        } else if (round !== null && line.trim()) {
+            rows.push(cols.slice(1));
+        }
+    }
+    flush();
+    return schedule;
+}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>總控台｜2026 Awaken</title>
+    <title>總控台｜Awaken</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -20,54 +20,30 @@
         <div class="head-right"><span class="hint" id="adminWho"></span><button class="btn btn-ghost" id="adminLogout">登出</button></div>
     </header>
 
-    <nav class="tabs" role="tablist">
-        <button class="tab active" data-tab="d2-panel">D2 自由闖關</button>
-        <button class="tab" data-tab="d3-panel">D3 PK 對抗</button>
-        <button class="tab" data-tab="score-panel">總積分</button>
+    <div class="practice-bar" id="practiceBar" hidden>
+        <span><b>練習模式</b>　現在所有人輸入的都是練習資料，不會影響正式成績。</span>
+        <button class="btn btn-outline" id="clearPracticeBtn">清空練習資料</button>
+        <button class="btn btn-primary" id="practiceOffBtn">結束練習模式</button>
+    </div>
+
+    <nav class="tabs">
+        <button class="tab active" data-tab="score-panel">總積分</button>
+        <button class="tab" data-tab="d2-panel">D2 大地</button>
+        <button class="tab" data-tab="d3-panel">D3 大地</button>
+        <button class="tab" data-tab="bonus-panel">加分紀錄</button>
         <button class="tab" data-tab="staff-panel">工作人員</button>
+        <button class="tab" data-tab="setup-panel">設定</button>
     </nav>
 
-    <!-- D2 -->
-    <section id="d2-panel" class="tab-panel">
-        <div class="toolbar">
-            <button class="btn btn-outline" id="d2_setBtn">參數設定</button>
-            <button class="btn btn-outline" id="d2_addBtn">新增紀錄</button>
-            <button class="btn btn-outline" id="d2_exportBtn">匯出 CSV</button>
-            <span class="spacer"></span>
-            <span class="state" id="d2_state"></span>
-            <button class="btn btn-outline" id="d2_lockBtn"></button>
-            <button class="btn btn-outline" id="d2_hideBtn"></button>
-            <button class="btn btn-danger" id="d2_clearBtn">清空 D2</button>
-        </div>
-        <div class="monitor-grid" id="d2_monitor"></div>
-    </section>
-
-    <!-- D3 -->
-    <section id="d3-panel" class="tab-panel" hidden>
-        <div class="toolbar">
-            <button class="btn btn-outline" id="d3_setBtn">參數設定</button>
-            <button class="btn btn-outline" id="d3_scheduleBtn">匯入賽程表</button>
-            <button class="btn btn-outline" id="d3_addBtn">新增紀錄</button>
-            <button class="btn btn-outline" id="d3_exportBtn">匯出 CSV</button>
-            <span class="spacer"></span>
-            <span class="state" id="d3_state"></span>
-            <button class="btn btn-outline" id="d3_lockBtn"></button>
-            <button class="btn btn-outline" id="d3_hideBtn"></button>
-            <button class="btn btn-danger" id="d3_clearBtn">清空 D3</button>
-        </div>
-        <div class="monitor-grid" id="d3_monitor"></div>
-    </section>
-
     <!-- 總積分 -->
-    <section id="score-panel" class="tab-panel" hidden>
+    <section id="score-panel" class="tab-panel">
         <div class="toolbar">
-            <button class="btn btn-outline" id="score_setBtn">隊伍與計分項目</button>
-            <button class="btn btn-primary" id="score_addBonusBtn">手動加 / 扣分</button>
-            <button class="btn btn-outline" id="exportTableBtn">匯出總分大表</button>
-            <button class="btn btn-outline" id="exportAllBtn">匯出全部明細</button>
+            <button class="btn btn-primary" data-add-bonus>手動加 / 扣分</button>
+            <label class="check"><input type="checkbox" id="liveToggle"> 預覽：把還沒公布的大地分數也算進去</label>
             <span class="spacer"></span>
-            <button class="btn btn-danger" id="clearBonusBtn">清空全部加分</button>
+            <button class="btn btn-outline" id="exportTableBtn">匯出總分大表</button>
         </div>
+        <div class="notice" id="publishNotice" hidden></div>
         <div class="notice" id="uncatNotice" hidden></div>
         <div class="table-wrap">
             <table class="score-table">
@@ -77,182 +53,137 @@
         </div>
     </section>
 
+    <!-- D2、D3：內容由程式產生，兩場共用同一套畫面 -->
+    <section id="d2-panel" class="tab-panel" data-game="d2" hidden></section>
+    <section id="d3-panel" class="tab-panel" data-game="d3" hidden></section>
+
+    <!-- 加分紀錄 -->
+    <section id="bonus-panel" class="tab-panel" hidden>
+        <div class="toolbar">
+            <button class="btn btn-primary" data-add-bonus>手動加 / 扣分</button>
+            <label class="check"><input type="checkbox" id="bonusShowDeleted"> 顯示已刪除</label>
+            <span class="spacer"></span>
+            <button class="btn btn-outline" id="exportBonusBtn">匯出加分紀錄</button>
+        </div>
+        <div class="table-wrap"><table class="rec-table" id="bonusTable"></table></div>
+    </section>
+
     <!-- 工作人員 -->
     <section id="staff-panel" class="tab-panel" hidden>
         <div class="toolbar">
             <button class="btn btn-primary" id="saveRosterBtn">儲存名單</button>
-            <span class="state">每一關填負責的關主名字，可以填好幾個，用逗號分隔。關主登入時輸入的名字要完全一樣。</span>
+            <span class="state">每一關填關主的名字，可以填好幾個，用逗號分隔。登入時輸入的名字要完全一樣。</span>
         </div>
         <div class="panel" style="margin-bottom:12px;">
             <h2 class="section-title" style="margin-top:0;">D2 關主</h2>
             <div class="roster-grid" id="roster_d2"></div>
             <h2 class="section-title">D3 關主</h2>
             <div class="roster-grid" id="roster_d3"></div>
-            <h2 class="section-title">NPC</h2>
+            <h2 class="section-title">加分人員（計分組、牧者）</h2>
             <div class="field"><input type="text" id="roster_npc" placeholder="例如：王小明, 李大華"></div>
-            <p class="hint">工作人員入口：<b id="staffUrl"></b>（把這個網址傳給關主就好）</p>
+            <p class="hint">工作人員入口：<b id="staffUrl"></b>（把這個網址傳給大家就好）</p>
         </div>
         <div class="panel">
             <h2 class="section-title" style="margin-top:0;">目前登入中</h2>
             <ul class="record-list online-list" id="sessionList"></ul>
         </div>
     </section>
-</div>
 
-<!-- D2 參數設定 -->
-<div class="modal" id="modal_d2_settings">
-    <div class="modal-box">
-        <h2>D2 參數設定</h2>
-        <div class="row">
-            <div class="field"><label class="label">總關卡數</label><input type="number" id="set_d2_stations"></div>
-            <div class="field"><label class="label">每關最多讚</label><input type="number" id="set_d2_maxLikes"></div>
-            <div class="field"><label class="label">一個讚幾分</label><input type="number" id="set_d2_likePts"></div>
-        </div>
-        <div class="row">
-            <div class="field"><label class="label">時間上限（分）</label><input type="number" id="set_d2_maxMin"></div>
-            <div class="field"><label class="label">時間上限（秒）</label><input type="number" id="set_d2_maxSec"></div>
-            <div class="field"><label class="label">分數上限</label><input type="number" id="set_d2_maxScore"></div>
-        </div>
-        <h3>名次積分</h3>
-        <div class="row">
-            <div class="field"><label class="label">第 1 名</label><input type="number" id="set_d2_top1"></div>
-            <div class="field"><label class="label">第 2 名</label><input type="number" id="set_d2_top2"></div>
-            <div class="field"><label class="label">第 3 名</label><input type="number" id="set_d2_top3"></div>
-            <div class="field"><label class="label">其他名次</label><input type="number" id="set_d2_base"></div>
-        </div>
-        <h3>各關計分方式</h3>
-        <div id="d2_station_configs"></div>
-        <div class="modal-actions">
-            <button class="btn btn-outline" data-close>取消</button>
-            <button class="btn btn-primary" id="save_d2_settings">儲存</button>
-        </div>
-    </div>
-</div>
-
-<!-- D3 參數設定 -->
-<div class="modal" id="modal_d3_settings">
-    <div class="modal-box">
-        <h2>D3 參數設定</h2>
-        <div class="row">
-            <div class="field"><label class="label">總關卡數</label><input type="number" id="set_d3_stations"></div>
-            <div class="field"><label class="label">總輪數</label><input type="number" id="set_d3_maxRounds"></div>
-            <div class="field"><label class="label">每場最多讚</label><input type="number" id="set_d3_maxLikes"></div>
-            <div class="field"><label class="label">一個讚幾分</label><input type="number" id="set_d3_likePts"></div>
-        </div>
-        <h3>名次積分</h3>
-        <div class="rank-score-grid" id="d3_rank_scores"></div>
-        <div class="modal-actions">
-            <button class="btn btn-outline" data-close>取消</button>
-            <button class="btn btn-primary" id="save_d3_settings">儲存</button>
-        </div>
-    </div>
-</div>
-
-<!-- D3 賽程表 -->
-<div class="modal" id="modal_d3_schedule">
-    <div class="modal-box">
-        <h2>匯入賽程表</h2>
-        <p class="hint" style="margin-bottom:10px;">
-            從 Excel 選取整張賽程表複製後貼上。格式：每一輪佔兩列，第一列開頭是「第1輪」，
-            後面每一欄是各關的 A 隊；下一列是對應的 B 隊。
-        </p>
-        <p class="hint" id="scheduleCurrent"></p>
-        <div class="field"><textarea id="scheduleInput" rows="8" placeholder="第1輪	1	3	5&#10;	2	4	6"></textarea></div>
-        <div class="modal-actions">
-            <button class="btn btn-outline" data-close>取消</button>
-            <button class="btn btn-primary" id="save_d3_schedule">解析並儲存</button>
-        </div>
-    </div>
-</div>
-
-<!-- 隊伍與計分項目 -->
-<div class="modal" id="modal_score_settings">
-    <div class="modal-box">
-        <h2>隊伍與計分項目</h2>
-        <div class="field"><label class="label">營會總隊數</label><input type="number" id="set_global_teams"></div>
-        <h3>每天的計分項目（用逗號分隔）</h3>
-        <p class="hint">項目名稱是「大地(D2)」「大地(D3)」的欄位，會自動填入遊戲成績；「NPC」欄位會收 NPC 加分。</p>
-        <div id="score_cols_fields"></div>
-        <div class="modal-actions">
-            <button class="btn btn-outline" data-close>取消</button>
-            <button class="btn btn-primary" id="save_global_settings">儲存</button>
-        </div>
-    </div>
-</div>
-
-<!-- D2 紀錄新增 / 編輯 -->
-<div class="modal" id="modal_d2_record">
-    <div class="modal-box">
-        <h2 id="d2_record_title">新增 D2 紀錄</h2>
-        <input type="hidden" id="d2_edit_id">
-        <div class="row">
-            <div class="field"><label class="label">關卡</label><select id="d2_rec_station"></select></div>
-            <div class="field"><label class="label">隊伍</label><select id="d2_rec_team"></select></div>
-        </div>
-        <div class="field" id="d2_rec_timeGroup">
-            <label class="label">時間</label>
-            <div class="time-row">
-                <input type="number" id="d2_rec_min" min="0"><span>分</span>
-                <input type="number" id="d2_rec_sec" min="0" max="59"><span>秒</span>
+    <!-- 設定 -->
+    <section id="setup-panel" class="tab-panel" hidden>
+        <div class="setup-grid">
+            <div class="panel">
+                <h2 class="section-title" style="margin-top:0;">隊伍與計分項目</h2>
+                <div class="field"><label class="label">營會總隊數</label><input type="number" id="set_teams" min="2"></div>
+                <p class="hint" style="margin-bottom:10px;">每天的計分項目用逗號分隔。名稱是「大地(D2)」「大地(D3)」的欄位會自動填入大地遊戲的分數。</p>
+                <div id="colsFields"></div>
+                <button class="btn btn-primary" id="saveCampBtn">儲存</button>
+            </div>
+            <div class="panel">
+                <h2 class="section-title" style="margin-top:0;">練習模式</h2>
+                <p class="hint" style="margin-bottom:10px;">關主訓時打開。打開後，所有人輸入的資料都存在另一個地方，可以隨便亂按，不會影響正式成績。</p>
+                <button class="btn btn-outline" id="practiceOnBtn">開啟練習模式</button>
+                <h2 class="section-title">匯出</h2>
+                <p class="hint" style="margin-bottom:10px;">修改紀錄包含每一次新增、修改、刪除、復原，是誰在什麼時候做的。</p>
+                <div class="toolbar">
+                    <button class="btn btn-outline" id="exportAuditBtn">匯出修改紀錄</button>
+                    <button class="btn btn-outline" id="exportAllBtn">匯出全部明細</button>
+                </div>
             </div>
         </div>
-        <div class="field" id="d2_rec_scoreGroup" hidden>
-            <label class="label">數值</label><input type="number" id="d2_rec_val">
+    </section>
+</div>
+
+<!-- 大地遊戲設定 -->
+<div class="modal" id="modal_game">
+    <div class="modal-box modal-wide">
+        <h2 id="game_title">大地遊戲設定</h2>
+        <div class="row">
+            <div class="field"><label class="label">關卡數</label><input type="number" id="game_stations" min="1" max="40"></div>
+            <div class="field"><label class="label">輪數</label><input type="number" id="game_rounds" min="1"></div>
+            <div class="field"><label class="label">每次最多讚</label><input type="number" id="game_maxLikes" min="0"></div>
+            <div class="field"><label class="label">一個讚幾分</label><input type="number" id="game_likePts"></div>
         </div>
-        <div class="field"><label class="label">讚數</label><input type="number" id="d2_rec_likes" min="0"></div>
+        <p class="hint">輪數大於 1 時，關主頁會出現「第幾輪」。讚數上限填 0 就是不使用讚。</p>
+        <h3>各關設定</h3>
+        <p class="hint" style="margin-bottom:10px;">
+            單隊闖關、多隊合作的分數寫成「名稱=分數」，用逗號分隔，例如 <code>過關=100, 完美過關=150</code>。<br>
+            多隊對抗寫每個名次的分數，例如 <code>100, 50</code>；平手分數可以不填（不填就是並列的隊伍平分）。
+        </p>
+        <div id="game_station_rows"></div>
+        <button class="btn btn-ghost" id="game_copyFirst">把第 1 關的類型和分數套用到全部關卡</button>
         <div class="modal-actions">
             <button class="btn btn-outline" data-close>取消</button>
-            <button class="btn btn-primary" id="save_d2_record">儲存</button>
+            <button class="btn btn-primary" id="game_save">儲存</button>
         </div>
     </div>
 </div>
 
-<!-- D3 紀錄新增 / 編輯 -->
-<div class="modal" id="modal_d3_record">
+<!-- 賽程表 -->
+<div class="modal" id="modal_schedule">
     <div class="modal-box">
-        <h2 id="d3_record_title">新增 D3 紀錄</h2>
-        <input type="hidden" id="d3_edit_id">
-        <div class="row">
-            <div class="field"><label class="label">關卡</label><select id="d3_rec_station"></select></div>
-            <div class="field"><label class="label">輪次</label><input type="number" id="d3_rec_round" min="1"></div>
-        </div>
-        <div class="row">
-            <div class="field"><label class="label">隊伍 A</label><select id="d3_rec_teamA"></select></div>
-            <div class="field"><label class="label">隊伍 B</label><select id="d3_rec_teamB"></select></div>
-        </div>
-        <div class="row">
-            <div class="field"><label class="label">A 隊讚數</label><input type="number" id="d3_rec_likesA" min="0"></div>
-            <div class="field"><label class="label">B 隊讚數</label><input type="number" id="d3_rec_likesB" min="0"></div>
-        </div>
-        <div class="field"><label class="label">獲勝隊伍</label><select id="d3_rec_winner"></select></div>
+        <h2 id="schedule_title">匯入賽程表</h2>
+        <p class="hint" style="margin-bottom:10px;">
+            從 Excel 選取整張賽程表複製後貼上。每一輪的第一列開頭寫「第1輪」，後面每一欄是一關；
+            同一欄往下是同一關的隊伍（兩隊對抗就兩列，四隊就四列）。
+        </p>
+        <p class="hint" id="schedule_current"></p>
+        <div class="field"><textarea id="schedule_input" rows="8" placeholder="第1輪	1	3	5&#10;	2	4	6"></textarea></div>
         <div class="modal-actions">
             <button class="btn btn-outline" data-close>取消</button>
-            <button class="btn btn-primary" id="save_d3_record">儲存</button>
+            <button class="btn btn-primary" id="schedule_save">解析並儲存</button>
         </div>
     </div>
 </div>
 
-<!-- 手動加 / 扣分 -->
+<!-- 大地紀錄新增 / 編輯 -->
+<div class="modal" id="modal_record">
+    <div class="modal-box">
+        <h2 id="record_title">新增紀錄</h2>
+        <div class="row">
+            <div class="field"><label class="label">關卡</label><select id="record_station"></select></div>
+            <div class="field" id="record_roundField"><label class="label">輪次</label><input type="number" id="record_round" min="1"></div>
+        </div>
+        <div id="record_fields"></div>
+        <p class="gate-error" id="record_error"></p>
+        <div class="modal-actions">
+            <button class="btn btn-outline" data-close>取消</button>
+            <button class="btn btn-primary" id="record_save">儲存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 手動加 / 扣分、編輯加分 -->
 <div class="modal" id="modal_bonus">
     <div class="modal-box">
-        <h2>手動加 / 扣分</h2>
+        <h2 id="bonus_title">手動加 / 扣分</h2>
         <div class="field"><label class="label">隊伍</label><select id="bonus_team"></select></div>
         <div class="field"><label class="label">計分項目</label><select id="bonus_reason"></select></div>
         <div class="field"><label class="label">分數（扣分加負號，例如 -50）</label><input type="number" id="bonus_val"></div>
         <div class="modal-actions">
             <button class="btn btn-outline" data-close>取消</button>
-            <button class="btn btn-primary" id="save_bonus">確認給分</button>
+            <button class="btn btn-primary" id="bonus_save">儲存</button>
         </div>
-    </div>
-</div>
-
-<!-- 未分類加分 -->
-<div class="modal" id="modal_uncat">
-    <div class="modal-box">
-        <h2>未分類的加分</h2>
-        <p class="hint" style="margin-bottom:10px;">這些加分的項目名稱對不上大表欄位（可能是欄位改過名）。分數仍有算進總分，選一個欄位就能歸位。</p>
-        <ul class="record-list" id="uncat_list"></ul>
-        <div class="modal-actions"><button class="btn btn-outline" data-close>關閉</button></div>
     </div>
 </div>
 

@@ -20,28 +20,29 @@
         </header>
         <p class="hint" style="margin-bottom:6px;">選你負責的關卡，再輸入你的名字。</p>
 
-        <h2 class="section-title">D2 自由闖關</h2>
+        <h2 class="section-title">D2 大地遊戲</h2>
         <div class="entry-grid" id="d2"></div>
 
-        <h2 class="section-title">D3 PK 對抗</h2>
+        <h2 class="section-title">D3 大地遊戲</h2>
         <div class="entry-grid" id="d3"></div>
 
         <h2 class="section-title">其他</h2>
         <div class="entry-grid">
-            <a class="entry" href="npc.html">NPC 加分</a>
+            <a class="entry" href="npc.html">場內加分</a>
         </div>
     </div>
 
     <script type="module">
         import { watchSettings } from "./firebase.js";
-        import { $ } from "./ui.js";
+        import { gameConfig } from "./games.js";
+        import { $, esc } from "./ui.js";
 
-        const links = (page, n) => Array.from({ length: n }, (_, i) =>
-            `<a class="entry" href="${page}?station=${i + 1}">第 <span class="num">${i + 1}</span> 關</a>`).join("");
+        const links = (game, g) => Object.keys(g.stations).map(Number).map(st =>
+            `<a class="entry" href="station.html?game=${game}&station=${st}"><span>第 <span class="num">${st}</span> 關</span>${g.stations[st].name ? `<small>${esc(g.stations[st].name)}</small>` : ""}</a>`).join("");
 
         watchSettings(s => {
-            $("d2").innerHTML = links("admin.html", s.numStations_d2);
-            $("d3").innerHTML = links("admin_2.html", s.numStations_d3);
+            $("d2").innerHTML = links("d2", gameConfig(s, "d2"));
+            $("d3").innerHTML = links("d3", gameConfig(s, "d3"));
         });
     </script>
 </body>
