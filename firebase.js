@@ -2,17 +2,22 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-    collection, doc, onSnapshot, getDoc, getDocs, addDoc, updateDoc, setDoc, deleteDoc, deleteField, writeBatch
+    collection, doc, onSnapshot, getDoc, getDocs, addDoc, updateDoc, setDoc, deleteDoc, deleteField, writeBatch,
+    connectFirestoreEmulator
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { firebaseConfig } from "./config.js";
 import { withDefaults } from "./scoring.js";
 
-export const app = initializeApp(firebaseConfig);
+// 自動化測試（e2e/）用：從 5190 埠打開時，改連本機的 Firebase 模擬器，完全不碰真的資料庫
+export const USE_EMULATOR = typeof location !== "undefined" && location.hostname === "localhost" && location.port === "5190";
+
+export const app = initializeApp(USE_EMULATOR ? { ...firebaseConfig, projectId: "demo-awaken" } : firebaseConfig);
 
 // 離線快取：營地訊號不好時，資料先存在手機，恢復連線後自動上傳
-export const db = initializeFirestore(app, {
+export const db = initializeFirestore(app, USE_EMULATOR ? {} : {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
+if (USE_EMULATOR) connectFirestoreEmulator(db, "127.0.0.1", 8080);
 
 export const settingsRef = doc(db, "settings_global", "global");
 export { collection, doc, onSnapshot, getDoc, getDocs, addDoc, updateDoc, setDoc, deleteDoc, deleteField, writeBatch };
@@ -21,6 +26,9 @@ export { collection, doc, onSnapshot, getDoc, getDocs, addDoc, updateDoc, setDoc
 // 第二個參數 online：false 代表目前讀的是手機快取（離線中）
 export function watchSettings(callback) {
     return onSnapshot(settingsRef, { includeMetadataChanges: true }, snap => {
+        // 手機上還沒有暫存、伺服器的資料也還沒到時先不通知，
+        // 不然畫面會先用預設值顯示（例如學員頁的開關），之後才跳成真正的設定
+        if (!snap.exists() && snap.metadata.fromCache) return;
         callback(withDefaults(snap.exists() ? snap.data() : {}), !snap.metadata.fromCache);
     });
 }

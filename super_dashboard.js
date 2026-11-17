@@ -42,6 +42,13 @@ async function run(promise, okText) {
     }
 }
 
+// ---------- 分頁（不用等登入和資料，一打開就能切換）----------
+
+document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
+    document.querySelectorAll(".tab-panel").forEach(p => { p.hidden = p.id !== tab.dataset.tab; });
+}));
+
 // ---------- 登入與初始化 ----------
 
 const admin = await requireAdmin();
@@ -59,11 +66,6 @@ try {
     toast("這個帳號沒有管理員權限，請確認安全規則裡有這個帳號的 UID", "error");
 }
 
-document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
-    document.querySelectorAll(".tab-panel").forEach(p => { p.hidden = p.id !== tab.dataset.tab; });
-}));
-
 watchCamp({
     settings(s, online, practice) {
         settings = s;
@@ -73,6 +75,8 @@ watchCamp({
         renderAll();
         renderRoster();
         renderSetup();
+        // 第一次收到資料時，所有按鈕都已經接好功能，才讓畫面可以操作
+        document.querySelector(".dash").removeAttribute("data-loading");
     },
     games(list) { games = list; renderAll(); },
     bonus(list) { bonus = list; renderAll(); },

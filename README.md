@@ -51,7 +51,39 @@ npm test                      # 計分邏輯
 node tools/check-imports.mjs  # 各檔案的 import 是否對得上
 ```
 
-安全規則改過之後，要對真的資料庫實測（第一次先在 `tools/rules-test` 執行 `npm install`）。
+### 瀏覽器自動化測試（每次改完程式都建議跑）
+
+用 Playwright 在三種裝置（電腦、iPhone、Android）上實際操作每一頁：
+能不能打開、有沒有錯誤、手機上有沒有超出畫面，以及關主、加分、總控台的完整流程。
+資料庫用本機的 Firebase 模擬器，**不會碰到真的資料**；安全規則也會一起測。
+
+第一次要先準備（只要一次）：
+
+```
+winget install Microsoft.OpenJDK.21
+cd e2e
+npm install
+npx playwright install chromium webkit
+```
+
+之後每次：
+
+```
+cd e2e
+npm test                          # 全部（約 3～4 分鐘，會比較吃 CPU）
+npm test -- --project=電腦         # 只跑電腦版
+npm test -- tests/station.spec.js  # 只跑關主頁
+npm run report                    # 看詳細報告（失敗時有截圖和操作錄影）
+```
+
+每一頁在每種裝置的截圖會存在 `e2e/screenshots/`，改版面後可以快速掃一遍。
+自動測試抓得到「壞掉、跑版、超出畫面」，抓不到「好不好看」，截圖還是要人看。
+
+測試只在 5190 埠開網頁時才會連到模擬器（`firebase.js` 的 `USE_EMULATOR`），正式網站不受影響。
+
+### 對真的資料庫測安全規則
+
+安全規則部署到正式專案後，可以再對真的資料庫實測一次（第一次先在 `tools/rules-test` 執行 `npm install`）。
 先在總控台把「測試關主」加進 D2 第 1 關的名單，再執行：
 
 ```

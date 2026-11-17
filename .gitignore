@@ -2,3 +2,8 @@ node_modules/
 .claude/
 .DS_Store
 Thumbs.db
+e2e/node_modules/
+e2e/test-results/
+e2e/report/
+e2e/screenshots/
+tools/rules-test/node_modules/

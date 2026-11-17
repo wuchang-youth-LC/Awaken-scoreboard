@@ -2,13 +2,14 @@
 // 關主：手機匿名登入 → 輸入名字 → 資料庫比對總控台的名單 → 建立 sessions/{uid}
 // 同一支手機之後打開不用再輸入（除非被總控台移除）
 import {
-    getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged
+    getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged, connectAuthEmulator
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { app, db, doc, getDoc, setDoc, deleteDoc, onSnapshot } from "./firebase.js";
+import { app, db, USE_EMULATOR, doc, getDoc, setDoc, deleteDoc, onSnapshot } from "./firebase.js";
 import { ROLES, normalizeName, sessionMatches, sessionLabel } from "./roster.js";
 import { esc } from "./ui.js";
 
 export const auth = getAuth(app);
+if (USE_EMULATOR) connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 
 // 等 Firebase 從手機裡讀回上次的登入狀態
 const authReady = new Promise(resolve => {

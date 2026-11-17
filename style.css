@@ -654,3 +654,27 @@ body.light .modal { background: rgba(6, 22, 55, 0.55); }
 
 .lockup-big { white-space: nowrap; }
 .phone .lockup-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 總控台載入中：資料還沒到、按鈕還沒接好功能前，先不顯示內容，避免按了沒反應 */
+.dash[data-loading] .tab-panel, .dash[data-loading] .practice-bar { visibility: hidden; }
+.dash[data-loading] .tabs::after { content: "載入中…"; margin-left: auto; align-self: center; color: var(--muted); font-size: 0.85rem; }
+
+/* 下拉選單：自己畫箭頭，不用瀏覽器內建的樣式
+   （iPhone Safari 內建的是白底，在深色畫面上會變成白底白字看不見） */
+select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: var(--field);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238fa3c8' stroke-width='2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 34px;
+}
+
+/* 右下角的連線狀態不要蓋住頁面最下面的按鈕 */
+body { padding-bottom: 48px; }
+
+/* 連線狀態：正常時是頁面最下面的一行小字；斷線時在最上面顯示整條紅色提示 */
+body { padding-bottom: 18px; }
+.conn-on { position: static; display: block; text-align: right; margin-top: 18px; padding: 0; background: none; }
+.conn-off { position: fixed; top: 0; left: 0; right: 0; bottom: auto; text-align: center; padding: 6px; z-index: 1200; }
