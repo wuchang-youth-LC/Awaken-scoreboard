@@ -678,3 +678,5 @@ body { padding-bottom: 48px; }
 body { padding-bottom: 18px; }
 .conn-on { position: static; display: block; text-align: right; margin-top: 18px; padding: 0; background: none; }
 .conn-off { position: fixed; top: 0; left: 0; right: 0; bottom: auto; text-align: center; padding: 6px; z-index: 1200; }
+
+.auto-hint { margin-left: 6px; padding: 0 6px; background: var(--yellow); color: var(--on-bright); font-size: 0.72rem; letter-spacing: 0; }

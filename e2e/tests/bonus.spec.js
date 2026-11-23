@@ -66,3 +66,27 @@ test("加分頁的總分即時包含還沒公布的大地分數", async ({ page 
     await staffLogin(page, "/npc.html", NAMES.npc);
     await expect(page.locator('#teamGrid button[data-team="第5隊"] small')).toHaveText("100");
 });
+
+test("依總控台設定的時間自動選項目，手動改了就照手動的", async ({ page }) => {
+    await seedBase({ bonusTimes: [{ minutes: 510, event: "早場" }, { minutes: 1140, event: "晚會" }] });
+    await page.clock.setFixedTime(new Date("2027-07-03T19:30:00+08:00"));
+    await staffLogin(page, "/npc.html", NAMES.npc);
+
+    await expect(page.locator("#daySelect")).toHaveValue("7/3");
+    await expect(page.locator("#eventSelect")).toHaveValue("晚會");
+    await expect(page.locator("#autoHint")).toBeVisible();
+
+    await page.locator("#eventSelect").selectOption("NPC");
+    await expect(page.locator("#autoHint")).toBeHidden();
+    await page.locator('#teamGrid button[data-team="第1隊"]').click();
+    await page.locator('#quickGrid button[data-val="10"]').click();
+    await expect(page.locator("#history li").first()).toContainText("7/3 NPC");
+});
+
+test("還沒到任何項目的時間，就用第一個項目", async ({ page }) => {
+    await seedBase({ bonusTimes: [{ minutes: 1140, event: "晚會" }] });
+    await page.clock.setFixedTime(new Date("2027-07-03T07:00:00+08:00"));
+    await staffLogin(page, "/npc.html", NAMES.npc);
+    await expect(page.locator("#eventSelect")).toHaveValue("早場");
+    await expect(page.locator("#autoHint")).toBeHidden();
+});

@@ -2,7 +2,7 @@
 // 操作：選隊伍 → 按常用分數就直接送出；按錯可以在下面馬上復原
 import { watchCamp, BONUS, createRecord, deleteRecord, restoreRecord } from "./store.js";
 import { computeCampTotals, GAME_COLUMNS } from "./games.js";
-import { campColumns, teamList, teamNum } from "./scoring.js";
+import { campColumns, teamList, teamNum, autoEvent } from "./scoring.js";
 import { $, esc, toast, failText, connectionBadge } from "./ui.js";
 import { requireStaff, logoutStaff } from "./auth.js";
 
@@ -35,10 +35,18 @@ function rememberEvent(day, event) {
 const gameCols = Object.values(GAME_COLUMNS);
 const eventsOf = day => (campColumns(settings).find(d => d.day === day)?.cols || []).filter(c => !gameCols.includes(c));
 
+const todayText = () => { const now = new Date(); return `${now.getMonth() + 1}/${now.getDate()}`; };
+const minutesNow = () => { const now = new Date(); return now.getHours() * 60 + now.getMinutes(); };
+let lastAuto = null;   // 上一次依時間自動選的項目；時間跨過下一個項目時才再自動切換
+
+// 依總控台設定的時間，今天現在應該是哪個項目（不是今天、沒設定時間就回傳 null）
+function currentAutoEvent() {
+    const day = $("daySelect").value;
+    return day === todayText() ? autoEvent(settings.bonusTimes || [], eventsOf(day), minutesNow()) : null;
+}
+
 function renderDays() {
-    const days = campColumns(settings).map(d => d.day);
-    const now = new Date();
-    const today = `${now.getMonth() + 1}/${now.getDate()}`;
+    const days = campColumns(settings).map(d => d.day), today = todayText();
     const current = days.includes($("daySelect").value) ? $("daySelect").value : (days.includes(today) ? today : days[0]);
     $("daySelect").innerHTML = days.map(d => `<option value="${esc(d)}"${d === current ? " selected" : ""}>${esc(d)}${d === today ? "（今天）" : ""}</option>`).join("");
     renderEvents();
@@ -46,11 +54,24 @@ function renderDays() {
 
 function renderEvents() {
     const day = $("daySelect").value, events = eventsOf(day);
-    const current = events.includes($("eventSelect").value) ? $("eventSelect").value : (events.includes(lastEvents[day]) ? lastEvents[day] : events[0]);
+    const auto = currentAutoEvent();
+    let current = $("eventSelect").value;
+    if (!events.includes(current) || (auto && auto !== lastAuto)) {
+        // 優先順序：依時間自動選 → 這一天上次用的 → 第一個
+        current = auto || (events.includes(lastEvents[day]) ? lastEvents[day] : events[0]);
+    }
+    lastAuto = auto;
     $("eventSelect").innerHTML = events.map(e => `<option value="${esc(e)}"${e === current ? " selected" : ""}>${esc(e)}</option>`).join("");
+    $("autoHint").hidden = !auto || current !== auto;
 }
-$("daySelect").addEventListener("change", renderEvents);
-$("eventSelect").addEventListener("change", () => rememberEvent($("daySelect").value, $("eventSelect").value));
+$("daySelect").addEventListener("change", () => { lastAuto = null; renderEvents(); });
+$("eventSelect").addEventListener("change", () => {
+    rememberEvent($("daySelect").value, $("eventSelect").value);
+    $("autoHint").hidden = true;
+});
+
+// 頁面一直開著時，時間跨過下一個項目就自動切換（手動選的在那之前不會被改掉）
+setInterval(() => { if (settings && currentAutoEvent() !== lastAuto) renderEvents(); }, 30_000);
 
 // ---------- 隊伍與分數 ----------
 

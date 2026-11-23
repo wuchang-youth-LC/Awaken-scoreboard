@@ -160,3 +160,17 @@ test("營會日期改成總控台設定，大表和加分頁跟著變", async ({
     await expect(npc.locator("#eventSelect option")).toHaveText(["早場", "晚會"]);
     await npc.close();
 });
+
+test("設定各項目的開始時間", async ({ page }) => {
+    await adminLogin(page);
+    await page.locator('.tab[data-tab="setup-panel"]').click();
+    await page.locator("#set_times").fill("19:00 晚會, 早場 8:30");
+    await page.locator("#saveCampBtn").click();
+    await expect.poll(async () => (await getDocument("settings_global/global")).bonusTimes)
+        .toEqual([{ minutes: 510, event: "早場" }, { minutes: 1140, event: "晚會" }]);
+    // 重新整理後顯示成整理過的格式
+    await page.reload();
+    await expect(page.locator(".dash")).not.toHaveAttribute("data-loading", "");
+    await page.locator('.tab[data-tab="setup-panel"]').click();
+    await expect(page.locator("#set_times")).toHaveValue("08:30 早場, 19:00 晚會");
+});

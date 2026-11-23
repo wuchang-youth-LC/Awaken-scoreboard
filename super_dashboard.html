@@ -104,6 +104,11 @@
                 <p class="hint" style="margin-bottom:10px;">每天的計分項目用逗號分隔。名稱是「大地(D2)」「大地(D3)」的欄位會自動填入大地遊戲的分數。</p>
                 <div id="colsFields"></div>
                 <div class="field">
+                    <label class="label">各項目的開始時間（加分頁會依時間自動選項目，可不填）</label>
+                    <input type="text" id="set_times" placeholder="08:30 早場, 14:00 大破冰, 19:00 晚會">
+                    <p class="hint">同名的項目每天都適用。例如填「19:00 晚會」，每天晚上 7 點後打開加分頁就會自動選「晚會」。</p>
+                </div>
+                <div class="field">
                     <label class="label">加分頁的常用分數按鈕（用逗號分隔，扣分加負號）</label>
                     <input type="text" id="set_quick" placeholder="10, 20, 30, 50, 100, -10">
                 </div>

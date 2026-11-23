@@ -9,7 +9,7 @@ import {
     validateRecord, recordPoints, resultText, computeCampTotals,
     parseLevels, formatLevels, parseNumberList, parseScheduleTeams, studentConfig
 } from "./games.js";
-import { campColumns, campDays, parseDays, resolveBonusKey, teamList, UNCATEGORIZED } from "./scoring.js";
+import { campColumns, campDays, parseDays, parseEventTimes, formatEventTimes, resolveBonusKey, teamList, UNCATEGORIZED } from "./scoring.js";
 import { $, esc, teamOptions, toast, toastCommit, connectionBadge, openModal, closeModal } from "./ui.js";
 import { requireAdmin, logoutAdmin } from "./auth.js";
 import { parseNames, rosterKey, sessionLabel } from "./roster.js";
@@ -536,6 +536,7 @@ function renderSetup() {
     $("set_days").value = campDays(settings).join(", ");
     renderColsFields(campColumns(settings).map(d => d.cols.join(",")));
     $("set_quick").value = (settings.bonusQuick || []).join(", ");
+    $("set_times").value = formatEventTimes(settings.bonusTimes);
     const view = studentConfig(settings);
     $("student_game").value = view.game;
     $("student_map").checked = view.map;
@@ -571,7 +572,7 @@ $("saveCampBtn").addEventListener("click", async () => {
     if (teams < 2) return toast("隊伍數至少要 2", "warn");
     const days = parseDays($("set_days").value);
     if (!days.length) return toast("請填營會日期，例如 7/1, 7/2, 7/3", "warn");
-    const fields = { numTeams: teams, days, bonusQuick: parseNumberList($("set_quick").value).filter(n => Number.isInteger(n) && n !== 0) };
+    const fields = { numTeams: teams, days, bonusTimes: parseEventTimes($("set_times").value), bonusQuick: parseNumberList($("set_quick").value).filter(n => Number.isInteger(n) && n !== 0) };
     days.forEach((_, i) => { fields[`cols_d${i + 1}`] = $(`set_cols_d${i + 1}`).value.trim(); });
     if (await run(commit(setDoc(settingsRef, fields, { merge: true })), "已儲存")) { setupDirty = false; renderSetup(); }
 });

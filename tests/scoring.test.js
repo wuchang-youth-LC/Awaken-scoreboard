@@ -210,3 +210,25 @@ test("營會日期：總控台有設定就用設定的，計分項目跟著日�
     // 超過預設天數的日子沒有預設項目
     assert.deepEqual(campColumns(withDefaults({ days: ["7/1", "7/2", "7/3", "7/4", "7/5"] }))[4].cols, []);
 });
+
+import { parseEventTimes, formatEventTimes, autoEvent } from "../scoring.js";
+
+test("項目時間：兩種寫法都看得懂，依時間排序", () => {
+    const times = parseEventTimes("19:00 晚會, 早場 8:30，14：00 大破冰\n亂打, 25:00 不存在");
+    assert.deepEqual(times, [
+        { minutes: 510, event: "早場" },
+        { minutes: 840, event: "大破冰" },
+        { minutes: 1140, event: "晚會" }
+    ]);
+    assert.equal(formatEventTimes(times), "08:30 早場, 14:00 大破冰, 19:00 晚會");
+});
+
+test("項目時間：選今天已經開始的最後一個項目", () => {
+    const times = parseEventTimes("08:30 早場, 14:00 大破冰, 19:00 晚會");
+    const today = ["早場", "晚會", "生活秩序"];   // 今天沒有大破冰
+    assert.equal(autoEvent(times, today, 7 * 60), null, "都還沒開始");
+    assert.equal(autoEvent(times, today, 9 * 60), "早場");
+    assert.equal(autoEvent(times, today, 15 * 60), "早場", "大破冰不是今天的項目，跳過");
+    assert.equal(autoEvent(times, today, 20 * 60), "晚會");
+    assert.equal(autoEvent([], today, 20 * 60), null, "沒設定時間");
+});

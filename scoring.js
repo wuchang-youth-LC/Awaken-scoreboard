@@ -287,3 +287,31 @@ export function computeTotals(s, recordsD2, recordsD3, recordsBonus) {
         uncategorizedRecords
     };
 }
+
+// ---------- 加分頁依時間自動選項目 ----------
+
+// 「08:30 早場, 19:00 晚會」或「早場 8:30」→ [{ minutes: 510, event: "早場" }, ...]，依時間排序
+export function parseEventTimes(text) {
+    const list = String(text ?? "").split(/[,，\n]+/).map(s => s.trim()).filter(Boolean).map(item => {
+        const m = item.match(/^(\d{1,2})[:：](\d{2})\s*(.+)$/) || item.match(/^(.+?)\s+(\d{1,2})[:：](\d{2})$/);
+        if (!m) return null;
+        const [h, min, event] = /^\d/.test(item) ? [m[1], m[2], m[3]] : [m[2], m[3], m[1]];
+        const hours = parseInt(h, 10), minutes = parseInt(min, 10);
+        if (hours > 23 || minutes > 59 || !event.trim()) return null;
+        return { minutes: hours * 60 + minutes, event: event.trim() };
+    }).filter(Boolean);
+    return list.sort((a, b) => a.minutes - b.minutes);
+}
+
+export function formatEventTimes(list) {
+    return (list || []).map(t => `${String(Math.floor(t.minutes / 60)).padStart(2, "0")}:${String(t.minutes % 60).padStart(2, "0")} ${t.event}`).join(", ");
+}
+
+// 現在應該是哪個項目：今天的項目裡，已經開始的最後一個；都還沒開始（或沒設定時間）回傳 null
+export function autoEvent(times, events, minutesNow) {
+    let pick = null;
+    for (const t of times || []) {
+        if (t.minutes <= minutesNow && events.includes(t.event)) pick = t.event;
+    }
+    return pick;
+}
