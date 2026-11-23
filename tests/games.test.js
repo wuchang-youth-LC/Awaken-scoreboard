@@ -190,8 +190,31 @@ test("賽程表：兩隊與四隊都能解析", () => {
 import { studentConfig } from "../games.js";
 
 test("學員頁設定：預設只開地圖", () => {
-    assert.deepEqual(studentConfig({}), { game: "d2", map: true, stations: false, scores: false });
-    assert.deepEqual(studentConfig({ student: { game: "d3", map: false, stations: true, scores: true } }),
-        { game: "d3", map: false, stations: true, scores: true });
+    assert.deepEqual(studentConfig({}), { game: "d2", map: true, stations: false, scores: false, desc: false, myTeam: false });
+    assert.deepEqual(studentConfig({ student: { game: "d3", map: false, stations: true, scores: true, desc: true, myTeam: true } }),
+        { game: "d3", map: false, stations: true, scores: true, desc: true, myTeam: true });
     assert.equal(studentConfig({ student: { game: "亂打" } }).game, "d2");
+});
+
+import { teamProgress } from "../games.js";
+
+test("學員頁：區塊預設都關閉（地圖除外），關卡說明會保存", () => {
+    assert.deepEqual(studentConfig({}), { game: "d2", map: true, stations: false, scores: false, desc: false, myTeam: false });
+    assert.equal(normalizeStation({ desc: "  兩人三腳繞場一圈 " }).desc, "兩人三腳繞場一圈");
+    assert.equal(normalizeStation().desc, "");
+});
+
+test("我的隊伍：玩過哪些關、拿幾分（未過關也算玩過）", () => {
+    const records = [
+        { game: "d2", station: 1, teams: ["第1隊"], result: { level: 1 }, likes: { "第1隊": 1 } },
+        { game: "d2", station: 2, teams: ["第1隊", "第2隊"], result: { level: null } },
+        { game: "d2", station: 1, teams: ["第3隊"], result: { level: 0 }, deleted: true },
+        { game: "d3", station: 1, teams: ["第1隊", "第2隊"], result: { ranks: [1, 2] } }
+    ];
+    const p = teamProgress(records, settings(), "d2", "第1隊");
+    assert.equal(p.played, 2);
+    assert.equal(p.total, 150 + 0 + 10);
+    assert.deepEqual(p.stations, [{ station: 1, played: true, points: 150 }, { station: 2, played: true, points: 0 }]);
+    assert.equal(teamProgress(records, settings(), "d2", "第3隊").played, 0, "已刪除的不算");
+    assert.equal(teamProgress(records, settings(), "d2", "第9隊").total, 0, "不存在的隊伍");
 });

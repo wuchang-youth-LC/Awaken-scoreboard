@@ -80,3 +80,26 @@ test("總控台：每個分頁", async ({ page }, info) => {
     await snap(page, info, "總控台-關卡設定");
     expectNoErrors(page);
 });
+
+test("學員頁：我的隊伍、關卡說明", async ({ page }, info) => {
+    await setDocument("settings_global/global", {
+        numTeams: 6,
+        games: { d2: { numStations: 4, stations: { 1: { name: "接力投球", place: "籃球場", desc: "四人接力，最後一人投進籃框才算過關", type: "solo", levels: [{ label: "過關", pts: 100 }] } } } },
+        student: { game: "d2", map: false, stations: false, scores: true, desc: true, myTeam: true }
+    });
+    await page.goto("/");
+    await expect(page.locator("#block-map")).toBeHidden();
+    await expect(page.locator("#myTeam")).toContainText("先在右上方選你是第幾隊");
+    await page.locator("#myTeamSelect").selectOption("第1隊");
+    await expect(page.locator("#myTeam .my-summary")).toContainText("120");
+    await expect(page.locator("#myTeam .my-stations span.done")).toHaveCount(1);
+    await expect(page.locator("#scores .mine")).toContainText("第1隊");
+    await expect(page.locator("#descList")).toContainText("四人接力");
+
+    // 重新整理後手機還記得是哪一隊
+    await page.reload();
+    await expect(page.locator("#myTeamSelect")).toHaveValue("第1隊");
+    await expectNoOverflow(page);
+    expectNoErrors(page);
+    await snap(page, info, "學員頁-我的隊伍與說明");
+});

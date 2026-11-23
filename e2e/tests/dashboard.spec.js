@@ -174,3 +174,12 @@ test("設定各項目的開始時間", async ({ page }) => {
     await page.locator('.tab[data-tab="setup-panel"]').click();
     await expect(page.locator("#set_times")).toHaveValue("08:30 早場, 19:00 晚會");
 });
+
+test("關卡設定可以填關卡說明", async ({ page }) => {
+    await adminLogin(page);
+    await page.locator('.tab[data-tab="d2-panel"]').click();
+    await page.locator('#d2-panel [data-act="settings"]').click();
+    await page.locator('#game_station_rows [data-st="3"] [data-f="desc"]').fill("蒙眼走平衡木");
+    await page.locator("#game_save").click();
+    await expect.poll(async () => (await getDocument("settings_global/global")).games.d2.stations["3"]?.desc).toBe("蒙眼走平衡木");
+});

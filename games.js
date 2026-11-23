@@ -42,6 +42,7 @@ export function normalizeStation(raw = {}) {
     const station = {
         name: String(raw.name ?? "").trim(),
         place: String(raw.place ?? "").trim(),
+        desc: String(raw.desc ?? "").trim(),   // 關卡說明（學員頁「關卡說明」區塊用）
         type,
         teamsPerMatch
     };
@@ -292,6 +293,20 @@ export function studentConfig(settings) {
         game: GAME_IDS.includes(raw.game) ? raw.game : GAME_IDS[0],
         map: raw.map !== false,
         stations: raw.stations === true,
-        scores: raw.scores === true
+        scores: raw.scores === true,
+        desc: raw.desc === true,        // 關卡說明
+        myTeam: raw.myTeam === true     // 我的隊伍：本隊得分、玩過哪些關
     };
+}
+
+// 某一隊在這場遊戲的進度：每一關玩過沒、拿幾分，以及總分
+export function teamProgress(records, settings, game, team) {
+    const row = gamePoints(records, settings, game)[team];
+    const g = gameConfig(settings, game);
+    const stations = Object.keys(g.stations).map(Number).map(st => ({
+        station: st,
+        played: row ? row.stations[st] !== undefined : false,
+        points: row?.stations[st] ?? 0
+    }));
+    return { total: row?.total ?? 0, likes: row?.likes ?? 0, played: stations.filter(s => s.played).length, stations };
 }

@@ -269,13 +269,14 @@ function stationRowHtml(st, cfg) {
             <input type="number" data-f="teams" title="每場幾隊" min="${GAME_TYPES[cfg.type].minTeams}" max="${GAME_TYPES[cfg.type].maxTeams}" value="${cfg.teamsPerMatch}" ${cfg.type === "solo" ? "disabled" : ""}>
             <input data-f="points" placeholder="${versus ? "100, 50" : "過關=100"}" value="${esc(points)}">
             <input type="number" data-f="tie" placeholder="平手" title="全部平手時每隊幾分（可不填）" value="${versus && cfg.tiePts !== null ? cfg.tiePts : ""}" ${versus ? "" : "disabled"}>
+            <input data-f="desc" class="cfg-desc" placeholder="關卡說明（學員頁顯示，可不填）" value="${esc(cfg.desc)}">
         </div>`;
 }
 
 function readStationRow(row) {
     const f = name => row.querySelector(`[data-f="${name}"]`);
     const type = f("type").value;
-    const raw = { name: f("name").value, place: f("place").value, type, teamsPerMatch: int(f("teams"), undefined) };
+    const raw = { name: f("name").value, place: f("place").value, desc: f("desc").value, type, teamsPerMatch: int(f("teams"), undefined) };
     if (type === "versus") {
         raw.rankPts = parseNumberList(f("points").value);
         raw.tiePts = f("tie").value === "" ? null : int(f("tie"), null);
@@ -317,14 +318,14 @@ $("game_station_rows").addEventListener("change", e => {
     if (e.target.dataset.f !== "type") return;
     const row = e.target.closest("[data-st]");
     const f = name => row.querySelector(`[data-f="${name}"]`);
-    row.outerHTML = stationRowHtml(row.dataset.st, normalizeStation({ name: f("name").value, place: f("place").value, type: e.target.value }));
+    row.outerHTML = stationRowHtml(row.dataset.st, normalizeStation({ name: f("name").value, place: f("place").value, desc: f("desc").value, type: e.target.value }));
 });
 
 $("game_copyFirst").addEventListener("click", () => {
     const rows = currentRows();
     const first = rows[1];
     if (!first) return;
-    for (const st of Object.keys(rows)) rows[st] = { ...first, name: rows[st].name, place: rows[st].place };
+    for (const st of Object.keys(rows)) rows[st] = { ...first, name: rows[st].name, place: rows[st].place, desc: rows[st].desc };
     renderStationRows(Object.keys(rows).length, rows);
 });
 
@@ -542,6 +543,8 @@ function renderSetup() {
     $("student_map").checked = view.map;
     $("student_stations").checked = view.stations;
     $("student_scores").checked = view.scores;
+    $("student_desc").checked = view.desc;
+    $("student_myTeam").checked = view.myTeam;
     $("studentUrl").textContent = new URL("index.html", location.href).href;
 }
 
@@ -561,7 +564,9 @@ $("saveStudentBtn").addEventListener("click", async () => {
         game: $("student_game").value,
         map: $("student_map").checked,
         stations: $("student_stations").checked,
-        scores: $("student_scores").checked
+        scores: $("student_scores").checked,
+        desc: $("student_desc").checked,
+        myTeam: $("student_myTeam").checked
     };
     if (await run(commit(updateDoc(settingsRef, { student })), "學員頁設定已儲存")) { setupDirty = false; renderSetup(); }
 });
