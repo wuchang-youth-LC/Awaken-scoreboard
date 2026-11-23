@@ -1,0 +1,75 @@
+# 每次推上 GitHub 就自動跑全部測試：
+#   1. 計分邏輯的單元測試（npm test）
+#   2. 瀏覽器自動化測試：電腦、iPhone、Android 三種裝置，資料庫用 Firebase 模擬器
+# 失敗時 GitHub 會寄信給推程式的人（GitHub 預設的通知設定）
+# 測試報告和每頁截圖可以在這次執行的 Artifacts 下載
+
+name: 自動測試
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: 單元測試 + 三種裝置的瀏覽器測試
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      # Firebase 模擬器需要 Java
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: 計分邏輯單元測試
+        run: npm test
+
+      - name: 檢查各檔案的 import
+        run: node tools/check-imports.mjs
+
+      - name: 安裝 Firebase CLI 與中文字型（截圖才看得到中文）
+        run: |
+          npm install -g firebase-tools
+          sudo apt-get update -q
+          sudo apt-get install -y -q fonts-noto-cjk
+
+      - name: 快取 Firebase 模擬器
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - name: 安裝 Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium webkit
+
+      - name: 瀏覽器自動化測試（電腦、iPhone、Android）
+        working-directory: e2e
+        run: npm test
+
+      - name: 上傳測試報告與截圖
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 測試報告與截圖
+          path: |
+            e2e/report/
+            e2e/screenshots/
+            e2e/test-results/
+          retention-days: 14
