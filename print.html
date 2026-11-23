@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>列印關卡牌｜Awaken</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="print.css">
+</head>
+<body>
+    <!-- 只在螢幕上顯示，列印時會隱藏 -->
+    <div class="controls">
+        <h1>列印關卡牌</h1>
+        <label>場次
+            <select id="gameSelect"><option value="d2">D2</option><option value="d3">D3</option></select>
+        </label>
+        <label class="check"><input type="checkbox" id="staffPage" checked> 最後加一張「工作人員入口」QR code</label>
+        <button id="printBtn">列印</button>
+        <p>一關一張 A4 橫式，黑白印表機就能印。關卡名稱、位置在總控台的「關卡設定」改。</p>
+    </div>
+
+    <main id="signs"></main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+    <script type="module" src="print.js"></script>
+</body>
+</html>

@@ -13,6 +13,7 @@
 | `station.html?game=d2&station=3` | 關主頁（D2 第 3 關） | 關主 | 輸入名字（要在名單上） |
 | `npc.html` | 場內加分 | 計分組、牧者 | 輸入名字（要在名單上） |
 | `super_dashboard.html` | 總控台：總積分、大地遊戲、加分紀錄、名單、設定 | 計分組管理員 | Email + 密碼 |
+| `print.html?game=d2` | 列印關卡牌（一關一張 A4），可加工作人員入口 QR code | 計分組 | 不用登入 |
 
 把 `staff.html` 的網址傳給工作人員就好，其他頁面都從那裡進去。
 

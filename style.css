@@ -704,3 +704,5 @@ body { padding-bottom: 18px; }
 
 /* 總控台關卡設定：說明欄佔整列 */
 .cfg-row .cfg-desc { grid-column: 2 / -1; }
+/* 還沒玩過的關卡：淺色實線框（虛線在手機上左右兩邊看不清楚，會連成一條） */
+.my-stations span { border: 1.5px solid var(--line); background: var(--shade); }

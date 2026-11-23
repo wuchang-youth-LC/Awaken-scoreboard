@@ -196,6 +196,7 @@ function renderGame(game) {
             <button class="btn btn-outline" data-act="schedule">賽程表</button>
             <button class="btn btn-outline" data-act="add">新增紀錄</button>
             <button class="btn btn-outline" data-act="export">匯出</button>
+            <a class="btn btn-outline" href="print.html?game=${game}" target="_blank" rel="noopener">列印關卡牌</a>
             <span class="spacer"></span>
             <span class="state">關主輸入：<b>${g.locked ? "已鎖定" : "開放中"}</b>　分數：<b>${g.published ? "已公布" : "未公布"}</b></span>
             <button class="btn btn-outline" data-act="lock">${g.locked ? "開放輸入" : "鎖定輸入"}</button>

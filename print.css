@@ -1,0 +1,84 @@
+/* 列印關卡牌：白底黑字，黑白印表機也清楚；只有細節用一點橘色 */
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    color: #0a1a3a;
+    background: #d9dde5;
+}
+
+/* ---------- 螢幕上的控制列 ---------- */
+
+.controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+    padding: 14px 18px; background: #061637; color: #fff;
+}
+.controls h1 { margin: 0; font-size: 1.2rem; letter-spacing: 0.08em; }
+.controls label { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+.controls select { padding: 6px 10px; font-size: 1rem; font-weight: 700; }
+.controls button {
+    padding: 8px 26px; border: none; background: #e8541f; color: #fff;
+    font: inherit; font-weight: 900; letter-spacing: 0.2em; cursor: pointer;
+}
+.controls p { width: 100%; margin: 0; font-size: 0.85rem; color: #b7c7e3; }
+
+/* ---------- 關卡牌（螢幕上是預覽，等比例縮小）---------- */
+
+main { padding: 20px; display: grid; gap: 20px; justify-items: center; }
+
+.sign {
+    width: 297mm; height: 210mm;          /* A4 橫式 */
+    padding: 14mm 18mm;
+    display: flex; flex-direction: column;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+}
+@media screen and (max-width: 1180px) {
+    .sign { zoom: 0.5; }
+}
+
+.sign header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 5mm; border-bottom: 1.2mm solid #0a1a3a;
+}
+.sign header img { height: 16mm; filter: brightness(0); }
+.sign header .game { font-weight: 900; font-size: 9mm; letter-spacing: 0.15em; }
+
+.sign .body { flex: 1; display: flex; align-items: center; gap: 14mm; min-height: 0; }
+.sign .no {
+    font-family: "Barlow Condensed", "Noto Sans TC", sans-serif;
+    font-weight: 700; font-size: 110mm; line-height: 0.85; letter-spacing: -0.02em;
+    display: flex; align-items: baseline;
+}
+.sign .no small { font-family: "Noto Sans TC", sans-serif; font-weight: 900; font-size: 18mm; margin: 0 3mm; }
+.sign .info { flex: 1; min-width: 0; border-left: 2.5mm solid #e8541f; padding-left: 9mm; }
+.sign .info h2 { margin: 0; font-size: 22mm; font-weight: 900; line-height: 1.15; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.sign .info .place { margin: 6mm 0 0; font-size: 11mm; font-weight: 700; color: #33415e; line-height: 1.35; }
+.sign .info .type { margin: 5mm 0 0; font-size: 7mm; color: #66708a; letter-spacing: 0.1em; }
+.sign footer {
+    padding-top: 4mm; border-top: 0.4mm solid #aab2c3;
+    font-family: "Barlow Condensed", "Noto Sans TC", sans-serif; font-size: 6mm; letter-spacing: 0.08em; color: #66708a;
+}
+
+/* 工作人員入口 */
+.staff-sign .qr { flex: none; width: 120mm; height: 120mm; }
+.staff-sign .qr img, .staff-sign .qr canvas { width: 100% !important; height: 100% !important; image-rendering: pixelated; }
+.staff-sign .info h2 { font-size: 15mm; }
+.staff-sign .info .url { margin: 8mm 0 0; font-family: ui-monospace, Consolas, monospace; font-size: 6mm; overflow-wrap: anywhere; color: #33415e; }
+.qr-missing { font-size: 6mm; color: #66708a; }
+
+/* ---------- 列印 ---------- */
+
+@page { size: A4 landscape; margin: 0; }
+@media print {
+    body { background: #fff; }
+    .controls { display: none; }
+    main { padding: 0; display: block; }
+    .sign { box-shadow: none; zoom: 1; break-after: page; page-break-after: always; }
+    .sign:last-child { break-after: auto; page-break-after: auto; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.staff-sign .info .place { font-size: 8.5mm; }
+.staff-sign .info h2 { font-size: 13mm; }

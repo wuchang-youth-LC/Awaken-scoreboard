@@ -103,3 +103,31 @@ test("學員頁：我的隊伍、關卡說明", async ({ page }, info) => {
     expectNoErrors(page);
     await snap(page, info, "學員頁-我的隊伍與說明");
 });
+
+test("列印關卡牌", async ({ page }, info) => {
+    await page.goto("/print.html?game=d2");
+    await expect(page.locator("#signs .sign")).toHaveCount(5);   // 4 關 + 工作人員入口
+    await expect(page.locator("#signs .sign").first()).toContainText("接力投球");
+    await expect(page.locator("#signs .sign").first()).toContainText("籃球場");
+    await expect(page.locator("#qr img, #qr canvas").first()).toBeAttached();
+
+    await page.locator("#staffPage").uncheck();
+    await expect(page.locator("#signs .sign")).toHaveCount(4);
+    await page.locator("#gameSelect").selectOption("d3");
+    await expect(page.locator("#signs .sign")).toHaveCount(3);
+    await expect(page.locator("#signs .sign").first()).toContainText("多隊對抗・2 隊");
+    expectNoErrors(page);
+
+    // 列印時的版面：一關一頁，控制列不會印出來
+    await page.locator("#gameSelect").selectOption("d2");
+    await page.locator("#staffPage").check();
+    await page.emulateMedia({ media: "print" });
+    await expect(page.locator(".controls")).toBeHidden();
+    await snap(page, info, "列印關卡牌");
+});
+
+test("總控台有列印關卡牌的入口", async ({ page }) => {
+    await adminLogin(page);
+    await page.locator('.tab[data-tab="d3-panel"]').click();
+    await expect(page.locator('#d3-panel a[href="print.html?game=d3"]')).toBeVisible();
+});
