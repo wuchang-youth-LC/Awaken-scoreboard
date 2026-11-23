@@ -83,17 +83,23 @@ export async function seedBase(extra = {}) {
 
 // ---------- 頁面 ----------
 
+// 測試環境特有、不影響使用的訊息（只限 Firebase 的即時連線，其他錯誤照樣會被抓出來）
+function ignorable(text) {
+    // Windows 版 WebKit（模擬 iPhone）和 Firebase 長連線之間的已知網路問題，Firebase 會自動重試；
+    // 真的 iPhone 用的是不同的網路底層，不會出現
+    if (text.includes("rewinding of the data stream failed")) return true;
+    // 重新整理或離開頁面時，WebKit 會把被中斷的 Firebase 即時連線記成錯誤（Linux 版才會出現）
+    if (text.includes("Firestore/Listen/channel") && text.includes("access control checks")) return true;
+    return false;
+}
+
 // 每個測試：自動按「確定」、清空輸入要打「確認」的視窗，並收集錯誤訊息
 export const test = base.extend({
     page: async ({ page }, use) => {
         const errors = [];
-        page.on("pageerror", err => errors.push(`頁面錯誤：${err.message}`));
+        page.on("pageerror", err => { if (!ignorable(err.message)) errors.push(`頁面錯誤：${err.message}`); });
         page.on("console", msg => {
-            if (msg.type() !== "error") return;
-            // Windows 版 WebKit（模擬 iPhone）和 Firebase 長連線之間的已知網路問題，Firebase 會自動重試；
-            // 真的 iPhone 用的是不同的網路底層，不會出現
-            if (msg.text().includes("rewinding of the data stream failed")) return;
-            errors.push(`console：${msg.text()}`);
+            if (msg.type() === "error" && !ignorable(msg.text())) errors.push(`console：${msg.text()}`);
         });
         page.on("dialog", d => (d.type() === "prompt" ? d.accept("確認") : d.accept()));
         page.errors = errors;
