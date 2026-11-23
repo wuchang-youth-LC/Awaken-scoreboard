@@ -187,3 +187,26 @@ test("總分：一筆資料都沒有時，大家都是 0", () => {
     const t = computeTotals(settings(), [], [], []);
     assert.ok(t.rows.every(r => r.total === 0));
 });
+
+import { normalizeDay, parseDays, campDays } from "../scoring.js";
+
+test("營會日期：各種寫法都整理成「月/日」", () => {
+    assert.equal(normalizeDay("7/2"), "7/2");
+    assert.equal(normalizeDay("07/02"), "7/2");
+    assert.equal(normalizeDay("7-12"), "7/12");
+    assert.equal(normalizeDay("7.2"), "7/2");
+    assert.equal(normalizeDay("7月2日"), "7/2");
+    assert.equal(normalizeDay("13/1"), null);
+    assert.equal(normalizeDay("明天"), null);
+    assert.deepEqual(parseDays("7/1, 7/2，7/3、7/3 亂打 7/4"), ["7/1", "7/2", "7/3", "7/4"]);
+});
+
+test("營會日期：總控台有設定就用設定的，計分項目跟著日期走", () => {
+    assert.deepEqual(campDays({}), ["7/2", "7/3", "7/4", "7/5"]);
+    const s = withDefaults({ days: ["7/1", "7/2", "7/3"], cols_d1: "開幕式", cols_d2: "早場,晚會" });
+    assert.deepEqual(campDays(s), ["7/1", "7/2", "7/3"]);
+    const cols = campColumns(s);
+    assert.deepEqual(cols.map(d => d.keys), [["7/1_開幕式"], ["7/2_早場", "7/2_晚會"], ["7/3_早場", "7/3_晚場", "7/3_NPC", "7/3_大地(D3)", "7/3_講員額外", "7/3_額外增減", "7/3_生活秩序"]]);
+    // 超過預設天數的日子沒有預設項目
+    assert.deepEqual(campColumns(withDefaults({ days: ["7/1", "7/2", "7/3", "7/4", "7/5"] }))[4].cols, []);
+});

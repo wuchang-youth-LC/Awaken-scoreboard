@@ -206,9 +206,28 @@ export function splitColumns(raw) {
     return String(raw).split(/[,，]/).map(c => c.trim()).filter(Boolean);
 }
 
+// 「7/2」「07/02」「7-2」「7.2」都整理成「7/2」；看不懂的回傳 null
+export function normalizeDay(text) {
+    const m = String(text ?? "").trim().match(/^(\d{1,2})\s*[/.\-月]\s*(\d{1,2})日?$/);
+    if (!m) return null;
+    const month = parseInt(m[1], 10), date = parseInt(m[2], 10);
+    return month >= 1 && month <= 12 && date >= 1 && date <= 31 ? `${month}/${date}` : null;
+}
+
+// 總控台輸入的日期：逗號、頓號、空白分隔，看不懂的和重複的略過
+export function parseDays(text) {
+    return [...new Set(String(text ?? "").split(/[,，、\s]+/).map(normalizeDay).filter(Boolean))];
+}
+
+// 營會日期：總控台有設定就用設定的，沒有才用 config.js 的預設
+export function campDays(s) {
+    const days = Array.isArray(s?.days) ? s.days.map(normalizeDay).filter(Boolean) : [];
+    return days.length ? days : CAMP.days;
+}
+
 export function campColumns(s) {
-    return CAMP.days.map((day, i) => {
-        const cols = splitColumns(s[`cols_d${i + 1}`] ?? DEFAULT_COLUMNS[i]);
+    return campDays(s).map((day, i) => {
+        const cols = splitColumns(s[`cols_d${i + 1}`] ?? DEFAULT_COLUMNS[i] ?? "");
         return { day, cols, keys: cols.map(c => `${day}_${c}`) };
     });
 }

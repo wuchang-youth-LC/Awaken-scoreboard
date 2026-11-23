@@ -9,8 +9,7 @@ import {
     validateRecord, recordPoints, resultText, computeCampTotals,
     parseLevels, formatLevels, parseNumberList, parseScheduleTeams, studentConfig
 } from "./games.js";
-import { campColumns, resolveBonusKey, teamList, UNCATEGORIZED } from "./scoring.js";
-import { CAMP } from "./config.js";
+import { campColumns, campDays, parseDays, resolveBonusKey, teamList, UNCATEGORIZED } from "./scoring.js";
 import { $, esc, teamOptions, toast, toastCommit, connectionBadge, openModal, closeModal } from "./ui.js";
 import { requireAdmin, logoutAdmin } from "./auth.js";
 import { parseNames, rosterKey, sessionLabel } from "./roster.js";
@@ -534,8 +533,8 @@ let setupDirty = false;
 function renderSetup() {
     if (!settings || setupDirty) return;
     $("set_teams").value = settings.numTeams;
-    $("colsFields").innerHTML = campColumns(settings).map((d, i) => `
-        <div class="field"><label class="label">${esc(d.day)}</label><input type="text" id="set_cols_d${i + 1}" value="${esc(d.cols.join(","))}"></div>`).join("");
+    $("set_days").value = campDays(settings).join(", ");
+    renderColsFields(campColumns(settings).map(d => d.cols.join(",")));
     $("set_quick").value = (settings.bonusQuick || []).join(", ");
     const view = studentConfig(settings);
     $("student_game").value = view.game;
@@ -544,6 +543,17 @@ function renderSetup() {
     $("student_scores").checked = view.scores;
     $("studentUrl").textContent = new URL("index.html", location.href).href;
 }
+
+// 每天一個計分項目欄位；日期改了就跟著增減，已經打的字照順序保留
+function renderColsFields(values) {
+    const days = parseDays($("set_days").value);
+    $("colsFields").innerHTML = days.map((day, i) => `
+        <div class="field"><label class="label">${esc(day)}</label><input type="text" id="set_cols_d${i + 1}" value="${esc(values[i] ?? "")}"></div>`).join("")
+        || `<p class="hint">請先填營會日期。</p>`;
+}
+$("set_days").addEventListener("input", () => {
+    renderColsFields([...document.querySelectorAll('#colsFields input')].map(el => el.value));
+});
 
 $("saveStudentBtn").addEventListener("click", async () => {
     const student = {
@@ -559,8 +569,10 @@ $("setup-panel").addEventListener("input", () => { setupDirty = true; });
 $("saveCampBtn").addEventListener("click", async () => {
     const teams = int("set_teams", settings.numTeams);
     if (teams < 2) return toast("隊伍數至少要 2", "warn");
-    const fields = { numTeams: teams, bonusQuick: parseNumberList($("set_quick").value).filter(n => Number.isInteger(n) && n !== 0) };
-    CAMP.days.forEach((_, i) => { fields[`cols_d${i + 1}`] = $(`set_cols_d${i + 1}`).value.trim(); });
+    const days = parseDays($("set_days").value);
+    if (!days.length) return toast("請填營會日期，例如 7/1, 7/2, 7/3", "warn");
+    const fields = { numTeams: teams, days, bonusQuick: parseNumberList($("set_quick").value).filter(n => Number.isInteger(n) && n !== 0) };
+    days.forEach((_, i) => { fields[`cols_d${i + 1}`] = $(`set_cols_d${i + 1}`).value.trim(); });
     if (await run(commit(setDoc(settingsRef, fields, { merge: true })), "已儲存")) { setupDirty = false; renderSetup(); }
 });
 

@@ -133,3 +133,30 @@ test("學員頁的區塊開關", async ({ page, browser }) => {
     await expect(student.locator("#block-scores")).toBeHidden();
     await student.close();
 });
+
+test("營會日期改成總控台設定，大表和加分頁跟著變", async ({ page, browser }) => {
+    await adminLogin(page);
+    await page.locator('.tab[data-tab="setup-panel"]').click();
+    await page.locator("#set_days").fill("7/1, 7/2, 7/3");
+    await expect(page.locator("#colsFields input")).toHaveCount(3);
+    await page.locator("#set_cols_d3").fill("早場,大地(D3),晚會");
+    await page.locator("#saveCampBtn").click();
+    await expect.poll(async () => (await getDocument("settings_global/global")).days).toEqual(["7/1", "7/2", "7/3"]);
+    expect((await getDocument("settings_global/global")).cols_d3).toBe("早場,大地(D3),晚會");
+
+    await page.locator('.tab[data-tab="score-panel"]').click();
+    const head = page.locator("#tableHead tr").first();
+    await expect(head).toContainText("7/1");
+    await expect(head).toContainText("7/3");
+    await expect(head).not.toContainText("7/4");
+
+    const npc = await (await browser.newContext(test.info().project.use)).newPage();
+    await npc.goto("/npc.html");
+    await npc.locator(".gate input[name=name]").fill(NAMES.npc);
+    await npc.locator(".gate button[type=submit]").click();
+    await expect(npc.locator("#daySelect option")).toHaveText([/7\/1/, /7\/2/, /7\/3/]);
+    await npc.locator("#daySelect").selectOption("7/3");
+    // 大地(D3) 由系統計算，不會出現在加分項目
+    await expect(npc.locator("#eventSelect option")).toHaveText(["早場", "晚會"]);
+    await npc.close();
+});

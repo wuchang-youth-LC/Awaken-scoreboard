@@ -4,6 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
     testDir: "./tests",
     workers: 1,               // 共用同一個模擬器資料庫，一次只跑一個
+    retries: 1,               // 失敗自動重試一次；重試才過的會在報告標成 flaky（多半是 Windows 版 WebKit 的網路問題）
     fullyParallel: false,
     timeout: 45_000,
     expect: { timeout: 8_000 },
